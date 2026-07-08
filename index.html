@@ -1391,7 +1391,7 @@ function parseCardText(rawText){
   }
 
   // Year
-  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  const yearMatch = text.match(/\b(?:19|20)\d{2}(?:-\d{2})?\b/);
   if(yearMatch) result.year = yearMatch[0];
 
   // Card number
@@ -1407,10 +1407,15 @@ function parseCardText(rawText){
     gradeNum = qualAdjacent[2];
   }else{
     const usedNumbers = new Set([result.number, result.year].filter(Boolean));
-    const isolatedNumberLine = lines.find(l => {
-      const t = l.trim();
-      return /^[0-9]{1,2}(\.5)?$/.test(t) && !usedNumbers.has(t);
+    const subgradeWordsRe = /\b(CENTERING|CORNERS|EDGES|SURFACE)\b/i;
+    const isIsolatedNumber = (l) => /^[0-9]{1,2}(\.5)?$/.test(l.trim()) && !usedNumbers.has(l.trim());
+    let isolatedNumberLine = lines.find((l, idx) => {
+      if(!isIsolatedNumber(l)) return false;
+      const prevIsSubgrade = idx > 0 && subgradeWordsRe.test(lines[idx-1]);
+      const nextIsSubgrade = idx < lines.length-1 && subgradeWordsRe.test(lines[idx+1]);
+      return !prevIsSubgrade && !nextIsSubgrade;
     });
+    if(!isolatedNumberLine) isolatedNumberLine = lines.find(isIsolatedNumber);
     if(isolatedNumberLine) gradeNum = isolatedNumberLine.trim();
     else if(company){
       const nearCompany = text.match(new RegExp(company + '\\D{0,15}?([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
@@ -1440,17 +1445,19 @@ function parseCardText(rawText){
 
   // Player name — score every plausible line instead of trusting a fixed position,
   // since two-column labels scramble OCR's line order.
-  const skipWords = /\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC|GEM|MT|MINT|ROOKIE|RC|CARD|AUTO|AUTOGRAPH|PATCH|MEM|MEMORABILIA|JERSEY|RELIC|REFRACTOR|PRIZM|PANINI|TOPPS|BOWMAN|CHROME|OPTIC|SELECT|MOSAIC|DONRUSS|UPPER|DECK|REVOLUTION|FRACTAL|CONTENDERS|CHRONICLES|ABSOLUTE|SPECTRA|ILLUSIONS|FLAWLESS|IMMACULATE|NATIONAL|TREASURES|CERTIFIED|ORIGINS|PHOENIX|HERITAGE|FINEST|GALLERY|STADIUM|CLUB|MUSEUM|UPDATE|ARCHIVES|GYPSY|QUEEN|GINTER|LEAGUE|OPENING|FUSION|HYPER|MOJO|SHIMMER|SCOPE|PULSAR|WAVE|DISCO|CRACKED|ICE|SNAKESKIN|SILVER|GOLD|NUMBERED|DRAFT|PROSPECT|LIMITED|PRIME|ELITE|SIGNATURES)\b/i;
+  const skipWords = /\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC|GEM|MT|MINT|ROOKIE|RC|CARD|AUTO|AUTOGRAPH|PATCH|MEM|MEMORABILIA|JERSEY|RELIC|REFRACTOR|PRIZM|PANINI|TOPPS|BOWMAN|CHROME|OPTIC|SELECT|MOSAIC|DONRUSS|UPPER|DECK|REVOLUTION|FRACTAL|CONTENDERS|CHRONICLES|ABSOLUTE|SPECTRA|ILLUSIONS|FLAWLESS|IMMACULATE|NATIONAL|TREASURES|CERTIFIED|ORIGINS|PHOENIX|HERITAGE|FINEST|GALLERY|STADIUM|CLUB|MUSEUM|UPDATE|ARCHIVES|GYPSY|QUEEN|GINTER|LEAGUE|OPENING|FUSION|HYPER|MOJO|SHIMMER|SCOPE|PULSAR|WAVE|DISCO|CRACKED|ICE|SNAKESKIN|SILVER|GOLD|NUMBERED|DRAFT|PROSPECT|LIMITED|PRIME|ELITE|SIGNATURES|CENTERING|CORNERS|EDGES|SURFACE)\b/i;
 
   const candidates = [];
   lines.forEach((l, idx) => {
-    if(/[-–—]/.test(l)) return; // a dash usually separates a set name from its parallel, not part of a person's name
     if(idx === yearLineIndex) return;
-    const letters = l.replace(/[^A-Za-z' ]/g, '').trim();
+    // Strip a card-number token (e.g. "#249") so a shared line like "#249 JA MORANT" can still qualify
+    const candidateLine = l.replace(/#\s?[A-Za-z0-9-]{1,8}/, '').trim();
+    if(/[-–—]/.test(candidateLine)) return; // a dash usually separates a set name from its parallel, not part of a person's name
+    const letters = candidateLine.replace(/[^A-Za-z' ]/g, '').trim();
     const words = letters.split(/\s+/).filter(Boolean);
     if(words.length < 1 || words.length > 4) return;
-    if(skipWords.test(l)) return;
-    if(/\d/.test(l)) return;
+    if(skipWords.test(candidateLine)) return;
+    if(/\d/.test(candidateLine)) return;
     if(letters.length < 3) return;
     candidates.push({ letters, wordCount: words.length, idx });
   });
