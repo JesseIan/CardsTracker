@@ -741,6 +741,7 @@
       <button class="btn secondary" id="importBtn">Import CSV</button>
       <input type="file" id="importFileInput" accept=".csv" style="display:none;">
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
+      <button class="btn secondary" id="scanCardBtn">📷 Scan card</button>
       <button class="btn" id="addBtn">+ Add card</button>
     </div>
   </div>
@@ -950,6 +951,57 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="scanModalOverlay">
+  <div class="modal">
+    <h2>Scan a card</h2>
+    <p class="sub">Take a photo or upload an image. Works best on a clear, well-lit graded slab label — raw card fronts are hit or miss.</p>
+
+    <input type="file" id="scan_fileInput" accept="image/*" style="display:none;">
+    <div id="scanChooseBtn" class="icon-btn" style="flex:none;display:inline-block;padding:9px 16px;">📷 Choose or take a photo</div>
+    <img id="scanPreviewImg" class="hidden" style="max-width:100%;border-radius:6px;margin-top:12px;display:block;">
+
+    <div id="scanStatus" class="sub hidden" style="margin-top:12px;"></div>
+
+    <div id="scanResultsBox" class="hidden" style="margin-top:16px;">
+      <div class="field full" style="margin-bottom:8px;">
+        <label>What we found — edit anything before continuing</label>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Player</label>
+          <input type="text" id="scan_player">
+        </div>
+        <div class="field">
+          <label>Year</label>
+          <input type="text" id="scan_year">
+        </div>
+        <div class="field">
+          <label>Card #</label>
+          <input type="text" id="scan_number">
+        </div>
+        <div class="field full">
+          <label>Set</label>
+          <input type="text" id="scan_set">
+        </div>
+        <div class="field full">
+          <label>Grade</label>
+          <input type="text" id="scan_grade">
+        </div>
+      </div>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;font-size:12px;color:var(--ink-soft);">Raw scanned text</summary>
+        <pre id="scanRawText" style="white-space:pre-wrap;font-size:11px;color:var(--ink-soft);margin-top:6px;max-height:120px;overflow-y:auto;"></pre>
+      </details>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" id="scanCancelBtn">Cancel</button>
+      <button class="btn secondary hidden" id="scanBtn">Scan text</button>
+      <button class="btn hidden" id="scanUseBtn">Use this info →</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="bulkModalOverlay">
   <div class="modal bulk-modal">
     <h2>Bulk add cards</h2>
@@ -1048,6 +1100,165 @@ function getBulkCellInput(rowIndex, colIndex){
   const cell = row.children[colIndex];
   if(!cell) return null;
   return cell.querySelector('input');
+}
+
+// ---------- Card scanner (on-device OCR) ----------
+let scanImageDataUrl = null;
+let tesseractLoadPromise = null;
+
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  if(tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Could not load the text scanner. Check your connection and try again.'));
+    document.head.appendChild(script);
+  });
+  return tesseractLoadPromise;
+}
+
+function openScanModal(){
+  scanImageDataUrl = null;
+  document.getElementById('scanPreviewImg').classList.add('hidden');
+  document.getElementById('scanPreviewImg').src = '';
+  document.getElementById('scanStatus').classList.add('hidden');
+  document.getElementById('scanResultsBox').classList.add('hidden');
+  document.getElementById('scanBtn').classList.add('hidden');
+  document.getElementById('scanUseBtn').classList.add('hidden');
+  document.getElementById('scan_fileInput').value = '';
+  document.getElementById('scanModalOverlay').classList.remove('hidden');
+}
+
+function closeScanModal(){
+  document.getElementById('scanModalOverlay').classList.add('hidden');
+}
+
+function setScanStatus(msg){
+  const el = document.getElementById('scanStatus');
+  if(!msg){ el.classList.add('hidden'); return; }
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+async function runCardScan(){
+  if(!scanImageDataUrl) return;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  setScanStatus('Loading text scanner...');
+  try{
+    await loadTesseract();
+    setScanStatus('Reading card — this can take a few seconds...');
+    const { data } = await window.Tesseract.recognize(scanImageDataUrl, 'eng');
+    const text = data.text || '';
+    const guesses = parseCardText(text);
+    document.getElementById('scan_player').value = guesses.player;
+    document.getElementById('scan_year').value = guesses.year;
+    document.getElementById('scan_set').value = guesses.set;
+    document.getElementById('scan_number').value = guesses.number;
+    document.getElementById('scan_grade').value = guesses.grade;
+    document.getElementById('scanRawText').textContent = text.trim() || '(no text detected)';
+    document.getElementById('scanResultsBox').classList.remove('hidden');
+    document.getElementById('scanUseBtn').classList.remove('hidden');
+    setScanStatus('');
+  }catch(e){
+    console.error('Scan failed', e);
+    setScanStatus(e.message || 'Could not read that image — try a clearer, closer photo.');
+  }
+  btn.disabled = false;
+}
+
+function parseCardText(rawText){
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+
+  const result = { player: '', year: '', set: '', number: '', grade: '' };
+
+  // Grading company
+  const companyMatch = text.match(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/i);
+  let company = '';
+  if(companyMatch){
+    company = companyMatch[1].toUpperCase();
+    if(company === 'BECKETT') company = 'BGS';
+  }
+
+  // Grade: qualitative term + number, e.g. "GEM MT 10"
+  let gradeNum = '';
+  const qualMatch = text.match(/\b(GEM\s?MT|MINT|NM-?MT|NM|EX-?MT|EX|VG-?EX|VG|GOOD|FR|PR)\s*([0-9]{1,2}(?:\.5)?)\b/i);
+  if(qualMatch){
+    gradeNum = qualMatch[2];
+  }else if(company){
+    const nearCompany = text.match(new RegExp(company + '\\D{0,15}?([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
+    if(nearCompany) gradeNum = nearCompany[1];
+  }
+  if(company && gradeNum) result.grade = `${company} ${gradeNum}`;
+  else if(company) result.grade = company;
+
+  // Year (first 19xx/20xx found)
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  if(yearMatch) result.year = yearMatch[0];
+
+  // Card number
+  const numMatch = text.match(/#\s?([A-Za-z0-9-]{1,8})/) || text.match(/\bNO\.?\s?([0-9]{1,5})\b/i);
+  if(numMatch) result.number = numMatch[1];
+
+  // Set: the line containing the year, with company/grade words stripped
+  if(yearMatch){
+    const yearLine = lines.find(l => l.includes(yearMatch[0]));
+    if(yearLine){
+      let cleaned = yearLine
+        .replace(yearMatch[0], '')
+        .replace(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/gi, '')
+        .replace(/\b(GEM\s?MT|MINT|NM-?MT|NM|EX-?MT|EX|VG-?EX|VG|GOOD|FR|PR)\b/gi, '')
+        .replace(/[#|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if(cleaned.length >= 2) result.set = cleaned;
+    }
+  }
+
+  // Player name: longest all-caps-ish line of 2-4 words, letters only, excluding known keywords
+  const skipWords = /\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC|GEM|MT|MINT|ROOKIE|RC|CARD|AUTO|AUTOGRAPH|PATCH|REFRACTOR|PRIZM|PANINI|TOPPS|BOWMAN|CHROME|OPTIC|SELECT|MOSAIC|DONRUSS|UPPER|DECK)\b/i;
+  let bestLine = '';
+  lines.forEach(l => {
+    const letters = l.replace(/[^A-Za-z ]/g, '').trim();
+    const words = letters.split(/\s+/).filter(Boolean);
+    if(words.length >= 2 && words.length <= 4 && !skipWords.test(l) && !/\d/.test(l)){
+      const isMostlyUpper = letters === letters.toUpperCase();
+      if(isMostlyUpper && letters.length > bestLine.length){
+        bestLine = letters;
+      }
+    }
+  });
+  if(bestLine){
+    result.player = bestLine.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  }
+
+  return result;
+}
+
+function useScanResults(){
+  const guesses = {
+    player: document.getElementById('scan_player').value.trim(),
+    year: document.getElementById('scan_year').value.trim(),
+    set: document.getElementById('scan_set').value.trim(),
+    number: document.getElementById('scan_number').value.trim(),
+    grade: document.getElementById('scan_grade').value.trim(),
+  };
+  const photoToAttach = scanImageDataUrl;
+  closeScanModal();
+  openModal();
+  document.getElementById('f_player').value = guesses.player;
+  document.getElementById('f_year').value = guesses.year;
+  document.getElementById('f_set').value = guesses.set;
+  document.getElementById('f_number').value = guesses.number;
+  document.getElementById('f_grade').value = guesses.grade;
+  updateCheckPriceLink();
+  if(photoToAttach){
+    modalPhotos.push({ id: null, label: 'Front', dataUrl: photoToAttach, isNew: true });
+    renderModalPhotos();
+  }
 }
 
 function openBulkModal(){
@@ -2152,6 +2363,34 @@ document.getElementById('lightboxNext').addEventListener('click', (e) => {
 });
 
 document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
+
+document.getElementById('scanCardBtn').addEventListener('click', openScanModal);
+document.getElementById('scanCancelBtn').addEventListener('click', closeScanModal);
+document.getElementById('scanModalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'scanModalOverlay') closeScanModal();
+});
+document.getElementById('scanChooseBtn').addEventListener('click', () => {
+  document.getElementById('scan_fileInput').click();
+});
+document.getElementById('scan_fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    scanImageDataUrl = await resizeImage(file);
+    const img = document.getElementById('scanPreviewImg');
+    img.src = scanImageDataUrl;
+    img.classList.remove('hidden');
+    document.getElementById('scanBtn').classList.remove('hidden');
+    document.getElementById('scanResultsBox').classList.add('hidden');
+    document.getElementById('scanUseBtn').classList.add('hidden');
+    setScanStatus('');
+  }catch(err){
+    console.error('Image read failed', err);
+    setScanStatus('Could not read that image — try a different file.');
+  }
+});
+document.getElementById('scanBtn').addEventListener('click', runCardScan);
+document.getElementById('scanUseBtn').addEventListener('click', useScanResults);
 
 document.getElementById('tabCollectionBtn').addEventListener('click', () => switchTab('collection'));
 document.getElementById('tabWatchlistBtn').addEventListener('click', () => switchTab('watchlist'));
