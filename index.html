@@ -149,6 +149,55 @@
     gap:16px;
     margin-top:20px;
   }
+
+  .tab-bar{
+    display:flex;
+    gap:6px;
+    margin-top:20px;
+    border-bottom:1px solid var(--line-strong);
+  }
+  .tab-btn{
+    font-family:'Oswald',sans-serif;
+    font-weight:500;
+    font-size:14px;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+    padding:10px 18px;
+    background:transparent;
+    border:none;
+    border-bottom:3px solid transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--gold);}
+  .tab-btn:hover{color:var(--ink);}
+
+  .watch-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(230px,1fr));
+    gap:18px;
+  }
+  .watch-card{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .watch-title{font-family:'Oswald',sans-serif;font-size:16px;font-weight:500;color:var(--ink);}
+  .watch-meta{font-size:12px;color:var(--ink-soft);}
+  .watch-prices{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+  }
+  .watch-diff{font-weight:600;}
+  .watch-diff.pos{color:var(--red-dark);}
+  .watch-diff.neg{color:var(--field-dark);}
+  .watch-notes{font-size:12px;color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--line);padding-top:8px;}
+  .watch-actions{display:flex;gap:8px;margin-top:4px;}
+
   .chart-panel{
     background:var(--paper);
     border:1px solid var(--line-strong);
@@ -329,6 +378,18 @@
     color:var(--red-dark);
     background:rgba(166,61,64,0.1);
     border:1px solid rgba(166,61,64,0.3);
+    padding:3px 8px;
+    border-radius:10px;
+    width:fit-content;
+  }
+  .grading-badge{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.4px;
+    color:var(--field-dark);
+    background:rgba(43,71,53,0.1);
+    border:1px solid rgba(43,71,53,0.3);
     padding:3px 8px;
     border-radius:10px;
     width:fit-content;
@@ -601,6 +662,13 @@
     </div>
   </div>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabCollectionBtn">Collection</button>
+    <button class="tab-btn" id="tabWatchlistBtn">Watchlist</button>
+  </div>
+
+  <div id="collectionView">
+
   <div class="charts-row">
     <div class="chart-panel">
       <div class="chart-panel-head">
@@ -635,12 +703,14 @@
 
   <div class="controls">
     <div class="filters">
+      <input type="text" id="searchInput" placeholder="Search player, set, variant..." style="min-width:200px;">
       <select id="filterSport"><option value="all">All sports</option></select>
       <select id="filterStatus">
         <option value="all">All cards</option>
         <option value="holding">Holding</option>
         <option value="sold">Sold</option>
         <option value="stale">Needs price check</option>
+        <option value="grading">At grading</option>
       </select>
       <select id="sortBy">
         <option value="roi_desc">Sort: ROI (high to low)</option>
@@ -661,6 +731,67 @@
 
   <div id="gridArea"></div>
 
+  </div>
+
+  <div id="watchlistView" class="hidden">
+    <div class="controls">
+      <div class="filters">
+        <input type="text" id="watchSearchInput" placeholder="Search watchlist..." style="min-width:200px;">
+      </div>
+      <button class="btn" id="addWatchBtn">+ Add to watchlist</button>
+    </div>
+    <div id="watchlistGridArea"></div>
+  </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="watchModalOverlay">
+  <div class="modal">
+    <h2 id="watchModalTitle">Add to watchlist</h2>
+    <p class="sub">Track a card you're eyeing before you buy it.</p>
+    <div class="form-grid">
+      <div class="field full">
+        <label>Player / card name</label>
+        <input type="text" id="w_player" placeholder="e.g. Victor Wembanyama">
+      </div>
+      <div class="field">
+        <label>Sport</label>
+        <input type="text" id="w_sport" placeholder="Basketball">
+      </div>
+      <div class="field">
+        <label>Year</label>
+        <input type="text" id="w_year" placeholder="2023">
+      </div>
+      <div class="field">
+        <label>Set / product</label>
+        <input type="text" id="w_set" placeholder="Panini Prizm">
+      </div>
+      <div class="field">
+        <label>Card #</label>
+        <input type="text" id="w_number" placeholder="#1">
+      </div>
+      <div class="field">
+        <label>Variant</label>
+        <input type="text" id="w_variant" placeholder="Refractor, Auto, /99...">
+      </div>
+      <div class="field">
+        <label>Target price ($)</label>
+        <input type="number" id="w_targetPrice" step="0.01" placeholder="What you'd pay">
+      </div>
+      <div class="field">
+        <label>Current market price ($)</label>
+        <input type="number" id="w_marketPrice" step="0.01" placeholder="What it's going for">
+      </div>
+      <div class="field full">
+        <label>Notes (optional)</label>
+        <textarea id="w_notes" placeholder="Where to find it, condition to look for, etc."></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="watchCancelBtn">Cancel</button>
+      <button class="btn" id="watchSaveBtn">Save</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay hidden" id="modalOverlay">
@@ -703,6 +834,21 @@
       <div class="field full">
         <label>Grading</label>
         <input type="text" id="f_grade" placeholder="PSA 10, BGS 9.5, or Raw">
+      </div>
+
+      <div class="field full">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="f_atGrading" style="width:auto;">
+          Currently submitted to a grading company
+        </label>
+      </div>
+      <div class="field" id="wrap_gradingCompany" style="display:none;">
+        <label>Grading company</label>
+        <input type="text" id="f_gradingCompany" placeholder="PSA, BGS, SGC...">
+      </div>
+      <div class="field" id="wrap_gradingDate" style="display:none;">
+        <label>Submitted date</label>
+        <input type="date" id="f_gradingSubmittedDate">
       </div>
       <div class="field">
         <label>Purchase price ($)</label>
@@ -844,6 +990,7 @@
 const STORAGE_KEY = 'portfolio';
 const PHOTOS_KEY = 'photos';
 let cards = [];
+let watchlist = [];
 let photos = {};
 let editingId = null;
 let modalPhotos = [];
@@ -1014,14 +1161,16 @@ async function loadData(){
   const fb = window.__fb;
   try{
     const snap = await fb.getDoc(fb.doc(fb.db, 'users', currentUid));
-    const raw = snap.exists() ? snap.data().portfolioJson : null;
-    cards = raw ? JSON.parse(raw) : [];
+    const data = snap.exists() ? snap.data() : {};
+    cards = data.portfolioJson ? JSON.parse(data.portfolioJson) : [];
+    watchlist = data.watchlistJson ? JSON.parse(data.watchlistJson) : [];
     let anyRepaired = false;
     cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
     if(anyRepaired) await saveData();
   }catch(e){
     console.error('Load error', e);
     cards = [];
+    watchlist = [];
   }
   try{
     photos = {};
@@ -1063,6 +1212,12 @@ function repairCardDates(card){
 async function saveData(){
   const fb = window.__fb;
   try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { portfolioJson: JSON.stringify(cards) }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
+}
+
+async function saveWatchlist(){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { watchlistJson: JSON.stringify(watchlist) }, { merge: true }); }
   catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
 }
 
@@ -1321,11 +1476,17 @@ function getFilteredSorted(){
   const sport = document.getElementById('filterSport').value;
   const status = document.getElementById('filterStatus').value;
   const sortBy = document.getElementById('sortBy').value;
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
 
   let list = cards.filter(c => {
     if(sport !== 'all' && (c.sport||'') !== sport) return false;
-    if(status === 'stale') return isStale(c);
-    if(status !== 'all' && c.status !== status) return false;
+    if(status === 'stale' && !isStale(c)) return false;
+    if(status === 'grading' && c.gradingStatus !== 'submitted') return false;
+    if(status !== 'all' && status !== 'stale' && status !== 'grading' && c.status !== status) return false;
+    if(search){
+      const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.notes].join(' ').toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
     return true;
   });
 
@@ -1397,6 +1558,7 @@ function renderSlab(c){
         <div class="slab-title">${escapeHtml(c.player || 'Untitled card')}</div>
         <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}${c.variant ? ' &middot; ' + escapeHtml(c.variant) : ''}</div>
         ${isStale(c) ? '<div class="stale-badge">⏱ Needs price check</div>' : ''}
+        ${c.gradingStatus === 'submitted' ? `<div class="grading-badge">📦 At ${escapeHtml(c.gradingCompany || 'grader')}${daysSince(c.gradingSubmittedDate) !== null ? ' — ' + daysSince(c.gradingSubmittedDate) + ' days' : ''}</div>` : ''}
         <div class="slab-nums">
           <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
@@ -1420,6 +1582,7 @@ function renderAll(){
   renderPortfolioChart();
   renderBreakdownChart();
   renderTopMovers();
+  renderWatchlist();
 }
 
 function renderBreakdownChart(){
@@ -1497,6 +1660,141 @@ function renderTopMovers(){
 
   document.getElementById('topGainersList').innerHTML = renderList(gainers, 'No gainers yet');
   document.getElementById('topLosersList').innerHTML = renderList(losers, 'No losers — nice');
+}
+
+function renderWatchlist(){
+  const area = document.getElementById('watchlistGridArea');
+  if(!area) return;
+  const search = document.getElementById('watchSearchInput').value.trim().toLowerCase();
+  let list = watchlist.slice();
+  if(search){
+    list = list.filter(w => [w.player, w.sport, w.set, w.variant, w.notes].join(' ').toLowerCase().includes(search));
+  }
+  list.sort((a,b) => (b.addedAt||0) - (a.addedAt||0));
+
+  if(watchlist.length === 0){
+    area.innerHTML = `
+      <div class="empty">
+        <h3>Nothing on your watchlist</h3>
+        <p>Track cards you're eyeing before you commit to buying.</p>
+        <button class="btn" onclick="openWatchModal()">+ Add to watchlist</button>
+      </div>`;
+    return;
+  }
+  if(list.length === 0){
+    area.innerHTML = `<div class="empty"><h3>No matches</h3><p>Try a different search.</p></div>`;
+    return;
+  }
+
+  area.innerHTML = `<div class="watch-grid">${list.map(renderWatchCard).join('')}</div>`;
+}
+
+function renderWatchCard(w){
+  const target = Number(w.targetPrice) || 0;
+  const market = Number(w.marketPrice) || 0;
+  const diff = market - target;
+  const hasBoth = target > 0 && market > 0;
+  return `
+    <div class="watch-card">
+      <div class="watch-title">${escapeHtml(w.player || 'Untitled')}</div>
+      <div class="watch-meta">${escapeHtml(w.sport || '')} ${escapeHtml(w.year || '')} ${escapeHtml(w.set || '')}${w.number ? ' &middot; #' + escapeHtml(w.number) : ''}${w.variant ? ' &middot; ' + escapeHtml(w.variant) : ''}</div>
+      <div class="watch-prices">
+        <div><span class="num-label">Target</span><br><span class="num-value">${target ? fmtMoney(target) : '—'}</span></div>
+        <div><span class="num-label">Market</span><br><span class="num-value">${market ? fmtMoney(market) : '—'}</span></div>
+      </div>
+      ${hasBoth ? `<div class="watch-diff ${diff > 0 ? 'pos' : 'neg'}">${diff > 0 ? 'Above target by ' + fmtMoney(diff) : 'At or below target by ' + fmtMoney(Math.abs(diff))}</div>` : ''}
+      ${w.notes ? `<div class="watch-notes">${escapeHtml(w.notes)}</div>` : ''}
+      <div class="watch-actions">
+        <div class="icon-btn" onclick="openWatchModal('${w.id}')">Edit</div>
+        <div class="icon-btn" onclick="moveWatchToCollection('${w.id}')">Move to collection</div>
+        <div class="icon-btn" onclick="deleteWatchItem('${w.id}')">Remove</div>
+      </div>
+    </div>`;
+}
+
+let editingWatchId = null;
+
+function openWatchModal(id){
+  editingWatchId = id || null;
+  document.getElementById('watchModalTitle').textContent = id ? 'Edit watchlist item' : 'Add to watchlist';
+  if(id){
+    const w = watchlist.find(x => x.id === id);
+    document.getElementById('w_player').value = w.player || '';
+    document.getElementById('w_sport').value = w.sport || '';
+    document.getElementById('w_year').value = w.year || '';
+    document.getElementById('w_set').value = w.set || '';
+    document.getElementById('w_number').value = w.number || '';
+    document.getElementById('w_variant').value = w.variant || '';
+    document.getElementById('w_targetPrice').value = w.targetPrice ?? '';
+    document.getElementById('w_marketPrice').value = w.marketPrice ?? '';
+    document.getElementById('w_notes').value = w.notes || '';
+  }else{
+    ['w_player','w_sport','w_year','w_set','w_number','w_variant','w_targetPrice','w_marketPrice','w_notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+  document.getElementById('watchModalOverlay').classList.remove('hidden');
+}
+
+function closeWatchModal(){
+  document.getElementById('watchModalOverlay').classList.add('hidden');
+  editingWatchId = null;
+}
+
+async function saveWatchItem(){
+  const player = document.getElementById('w_player').value.trim();
+  if(!player){ document.getElementById('w_player').focus(); return; }
+  const data = {
+    player,
+    sport: document.getElementById('w_sport').value.trim(),
+    year: document.getElementById('w_year').value.trim(),
+    set: document.getElementById('w_set').value.trim(),
+    number: document.getElementById('w_number').value.trim(),
+    variant: document.getElementById('w_variant').value.trim(),
+    targetPrice: parseFloat(document.getElementById('w_targetPrice').value) || 0,
+    marketPrice: parseFloat(document.getElementById('w_marketPrice').value) || 0,
+    notes: document.getElementById('w_notes').value.trim(),
+  };
+  if(editingWatchId){
+    const idx = watchlist.findIndex(w => w.id === editingWatchId);
+    if(idx > -1) watchlist[idx] = { ...watchlist[idx], ...data };
+  }else{
+    watchlist.push({ id: uid(), addedAt: Date.now(), ...data });
+  }
+  await saveWatchlist();
+  closeWatchModal();
+  renderWatchlist();
+}
+
+async function deleteWatchItem(id){
+  if(!confirm('Remove this item from your watchlist?')) return;
+  watchlist = watchlist.filter(w => w.id !== id);
+  await saveWatchlist();
+  renderWatchlist();
+}
+
+function moveWatchToCollection(id){
+  const w = watchlist.find(x => x.id === id);
+  if(!w) return;
+  openModal();
+  document.getElementById('f_player').value = w.player || '';
+  document.getElementById('f_sport').value = w.sport || '';
+  document.getElementById('f_year').value = w.year || '';
+  document.getElementById('f_set').value = w.set || '';
+  document.getElementById('f_number').value = w.number || '';
+  document.getElementById('f_variant').value = w.variant || '';
+  if(w.targetPrice) document.getElementById('f_purchasePrice').value = w.targetPrice;
+  if(w.targetPrice) document.getElementById('f_currentValue').value = w.targetPrice;
+  pendingMoveWatchId = id;
+}
+let pendingMoveWatchId = null;
+
+function switchTab(tab){
+  const isCollection = tab === 'collection';
+  document.getElementById('collectionView').classList.toggle('hidden', !isCollection);
+  document.getElementById('watchlistView').classList.toggle('hidden', isCollection);
+  document.getElementById('tabCollectionBtn').classList.toggle('active', isCollection);
+  document.getElementById('tabWatchlistBtn').classList.toggle('active', !isCollection);
 }
 
 function renderModalPhotos(){
@@ -1581,20 +1879,26 @@ function openModal(id){
     document.getElementById('f_notes').value = c.notes || '';
     document.getElementById('statusHolding').checked = c.status !== 'sold';
     document.getElementById('statusSold').checked = c.status === 'sold';
+    document.getElementById('f_atGrading').checked = c.gradingStatus === 'submitted';
+    document.getElementById('f_gradingCompany').value = c.gradingCompany || '';
+    document.getElementById('f_gradingSubmittedDate').value = c.gradingSubmittedDate || '';
     modalPhotos = (photos[id] || []).map(p => ({ id: p.id, label: p.label, dataUrl: p.dataUrl, isNew: false, labelChanged: false }));
   }else{
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
     ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_purchasePrice',
-     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes'].forEach(id => {
+     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes',
+     'f_gradingCompany','f_gradingSubmittedDate'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('statusHolding').checked = true;
+    document.getElementById('f_atGrading').checked = false;
     modalPhotos = [];
   }
   removedPhotoIds = [];
   document.getElementById('f_photoInput').value = '';
   toggleSoldFields();
+  toggleGradingFields();
   renderModalPhotos();
   overlay.classList.remove('hidden');
 }
@@ -1604,6 +1908,7 @@ function closeModal(){
   editingId = null;
   modalPhotos = [];
   removedPhotoIds = [];
+  pendingMoveWatchId = null;
 }
 
 function toggleSoldFields(){
@@ -1611,6 +1916,15 @@ function toggleSoldFields(){
   document.getElementById('wrap_currentValue').style.display = sold ? 'none' : 'flex';
   document.getElementById('wrap_soldPrice').style.display = sold ? 'flex' : 'none';
   document.getElementById('wrap_soldDate').style.display = sold ? 'flex' : 'none';
+}
+
+function toggleGradingFields(){
+  const on = document.getElementById('f_atGrading').checked;
+  document.getElementById('wrap_gradingCompany').style.display = on ? 'flex' : 'none';
+  document.getElementById('wrap_gradingDate').style.display = on ? 'flex' : 'none';
+  if(on && !document.getElementById('f_gradingSubmittedDate').value){
+    document.getElementById('f_gradingSubmittedDate').value = todayIso();
+  }
 }
 
 async function saveCard(){
@@ -1636,6 +1950,9 @@ async function saveCard(){
     soldPrice: parseFloat(document.getElementById('f_soldPrice').value) || 0,
     soldDate: document.getElementById('f_soldDate').value,
     notes: document.getElementById('f_notes').value.trim(),
+    gradingStatus: document.getElementById('f_atGrading').checked ? 'submitted' : '',
+    gradingCompany: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingCompany').value.trim() : '',
+    gradingSubmittedDate: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingSubmittedDate').value : '',
   };
 
   let targetId = editingId;
@@ -1684,6 +2001,13 @@ async function saveCard(){
   photos[targetId] = finalPhotos;
 
   await saveData();
+
+  if(pendingMoveWatchId){
+    watchlist = watchlist.filter(w => w.id !== pendingMoveWatchId);
+    await saveWatchlist();
+    pendingMoveWatchId = null;
+  }
+
   closeModal();
   renderAll();
 }
@@ -1728,6 +2052,7 @@ document.getElementById('cancelBtn').addEventListener('click', closeModal);
 document.getElementById('saveBtn').addEventListener('click', saveCard);
 document.getElementById('statusHolding').addEventListener('change', toggleSoldFields);
 document.getElementById('statusSold').addEventListener('change', toggleSoldFields);
+document.getElementById('f_atGrading').addEventListener('change', toggleGradingFields);
 document.getElementById('modalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'modalOverlay') closeModal();
 });
@@ -1735,6 +2060,7 @@ document.getElementById('filterSport').addEventListener('change', renderGrid);
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
 document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
+document.getElementById('searchInput').addEventListener('input', renderGrid);
 document.getElementById('sortBy').addEventListener('change', renderGrid);
 
 document.getElementById('photoUploadBtn').addEventListener('click', () => {
@@ -1778,6 +2104,17 @@ document.getElementById('lightboxNext').addEventListener('click', (e) => {
 });
 
 document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
+
+document.getElementById('tabCollectionBtn').addEventListener('click', () => switchTab('collection'));
+document.getElementById('tabWatchlistBtn').addEventListener('click', () => switchTab('watchlist'));
+
+document.getElementById('addWatchBtn').addEventListener('click', () => openWatchModal());
+document.getElementById('watchCancelBtn').addEventListener('click', closeWatchModal);
+document.getElementById('watchSaveBtn').addEventListener('click', saveWatchItem);
+document.getElementById('watchModalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'watchModalOverlay') closeWatchModal();
+});
+document.getElementById('watchSearchInput').addEventListener('input', renderWatchlist);
 document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
 document.getElementById('bulkSaveBtn').addEventListener('click', saveBulkCards);
 document.getElementById('bulkAddRowBtn').addEventListener('click', addBulkRow);
@@ -1817,10 +2154,11 @@ function updateWelcomeText(user){
 }
 
 function exportCsv(){
-  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes'];
+  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date'];
   const rows = cards.map(c => [
     c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.status,
-    c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes
+    c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes,
+    c.gradingStatus, c.gradingCompany, c.gradingSubmittedDate
   ]);
   const csvEscape = (v) => {
     if(v === undefined || v === null) v = '';
@@ -1894,6 +2232,9 @@ function importCsvFile(file){
       soldPrice: colIndex(['sold price']),
       soldDate: colIndex(['sold date']),
       notes: colIndex(['notes']),
+      gradingStatus: colIndex(['grading status']),
+      gradingCompany: colIndex(['grading company']),
+      gradingSubmittedDate: colIndex(['grading submitted date']),
     };
     if(idx.player === -1){
       alert('Could not find a "Player" column in that CSV — make sure it matches the exported format.');
@@ -1933,6 +2274,9 @@ function importCsvFile(file){
         soldPrice: isSold ? soldPrice : 0,
         soldDate: isSold ? (soldDate || todayIso()) : '',
         notes: get(r, 'notes'),
+        gradingStatus: get(r, 'gradingStatus') === 'submitted' ? 'submitted' : '',
+        gradingCompany: get(r, 'gradingCompany'),
+        gradingSubmittedDate: normalizeDate(get(r, 'gradingSubmittedDate')),
         history: [{ date: purchaseDate, value: purchasePrice }]
       };
       if(isSold){
@@ -2074,6 +2418,7 @@ function startApp(){
     }else{
       currentUid = null;
       cards = [];
+      watchlist = [];
       photos = {};
       document.getElementById('appWrap').classList.add('hidden');
       document.getElementById('profileModalOverlay').classList.add('hidden');
