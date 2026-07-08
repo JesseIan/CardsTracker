@@ -1380,6 +1380,8 @@ function parseCardText(rawText){
 
   const result = { player: '', year: '', set: '', number: '', grade: '' };
 
+  const qualRe = /\b(GEM\s?MT|MINT|NM-?MT|NM|EX-?MT|EX|VG-?EX|VG|GOOD|FR|PR)\b/i;
+
   // Grading company
   const companyMatch = text.match(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/i);
   let company = '';
@@ -1388,19 +1390,7 @@ function parseCardText(rawText){
     if(company === 'BECKETT') company = 'BGS';
   }
 
-  // Grade: qualitative term + number, e.g. "GEM MT 10"
-  let gradeNum = '';
-  const qualMatch = text.match(/\b(GEM\s?MT|MINT|NM-?MT|NM|EX-?MT|EX|VG-?EX|VG|GOOD|FR|PR)\s*([0-9]{1,2}(?:\.5)?)\b/i);
-  if(qualMatch){
-    gradeNum = qualMatch[2];
-  }else if(company){
-    const nearCompany = text.match(new RegExp(company + '\\D{0,15}?([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
-    if(nearCompany) gradeNum = nearCompany[1];
-  }
-  if(company && gradeNum) result.grade = `${company} ${gradeNum}`;
-  else if(company) result.grade = company;
-
-  // Year (first 19xx/20xx found)
+  // Year
   const yearMatch = text.match(/\b(19|20)\d{2}\b/);
   if(yearMatch) result.year = yearMatch[0];
 
@@ -1408,7 +1398,30 @@ function parseCardText(rawText){
   const numMatch = text.match(/#\s?([A-Za-z0-9-]{1,8})/) || text.match(/\bNO\.?\s?([0-9]{1,5})\b/i);
   if(numMatch) result.number = numMatch[1];
 
-  // Set: the line containing the year, with company/grade words stripped
+  // Grade — labels are two-column (description left, grade stacked right), so OCR often
+  // separates the quality word ("MINT") from its number ("9") onto different lines.
+  // Try adjacent match first, then fall back to finding an isolated number elsewhere.
+  let gradeNum = '';
+  const qualAdjacent = text.match(new RegExp(qualRe.source + '\\s*([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
+  if(qualAdjacent){
+    gradeNum = qualAdjacent[2];
+  }else{
+    const usedNumbers = new Set([result.number, result.year].filter(Boolean));
+    const isolatedNumberLine = lines.find(l => {
+      const t = l.trim();
+      return /^[0-9]{1,2}(\.5)?$/.test(t) && !usedNumbers.has(t);
+    });
+    if(isolatedNumberLine) gradeNum = isolatedNumberLine.trim();
+    else if(company){
+      const nearCompany = text.match(new RegExp(company + '\\D{0,15}?([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
+      if(nearCompany) gradeNum = nearCompany[1];
+    }
+  }
+  if(company && gradeNum) result.grade = `${company} ${gradeNum}`;
+  else if(company) result.grade = company;
+  else if(gradeNum) result.grade = gradeNum;
+
+  // Set: the line containing the year, cleaned of company/grade/card-number noise
   let yearLineIndex = -1;
   if(yearMatch){
     yearLineIndex = lines.findIndex(l => l.includes(yearMatch[0]));
@@ -1416,7 +1429,8 @@ function parseCardText(rawText){
       let cleaned = lines[yearLineIndex]
         .replace(yearMatch[0], '')
         .replace(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/gi, '')
-        .replace(/\b(GEM\s?MT|MINT|NM-?MT|NM|EX-?MT|EX|VG-?EX|VG|GOOD|FR|PR)\b/gi, '')
+        .replace(qualRe, '')
+        .replace(/#\s?[A-Za-z0-9-]{1,8}/g, '')
         .replace(/[#|]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -1424,31 +1438,32 @@ function parseCardText(rawText){
     }
   }
 
-  const skipWords = /\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC|GEM|MT|MINT|ROOKIE|RC|CARD|AUTO|AUTOGRAPH|PATCH|REFRACTOR|PRIZM|PANINI|TOPPS|BOWMAN|CHROME|OPTIC|SELECT|MOSAIC|DONRUSS|UPPER|DECK)\b/i;
+  // Player name — score every plausible line instead of trusting a fixed position,
+  // since two-column labels scramble OCR's line order.
+  const skipWords = /\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC|GEM|MT|MINT|ROOKIE|RC|CARD|AUTO|AUTOGRAPH|PATCH|MEM|MEMORABILIA|JERSEY|RELIC|REFRACTOR|PRIZM|PANINI|TOPPS|BOWMAN|CHROME|OPTIC|SELECT|MOSAIC|DONRUSS|UPPER|DECK|REVOLUTION|FRACTAL|CONTENDERS|CHRONICLES|ABSOLUTE|SPECTRA|ILLUSIONS|FLAWLESS|IMMACULATE|NATIONAL|TREASURES|CERTIFIED|ORIGINS|PHOENIX|HERITAGE|FINEST|GALLERY|STADIUM|CLUB|MUSEUM|UPDATE|ARCHIVES|GYPSY|QUEEN|GINTER|LEAGUE|OPENING|FUSION|HYPER|MOJO|SHIMMER|SCOPE|PULSAR|WAVE|DISCO|CRACKED|ICE|SNAKESKIN|SILVER|GOLD|NUMBERED|DRAFT|PROSPECT|LIMITED|PRIME|ELITE|SIGNATURES)\b/i;
 
-  const looksLikeName = (line) => {
-    const letters = line.replace(/[^A-Za-z' -]/g, '').trim();
+  const candidates = [];
+  lines.forEach((l, idx) => {
+    if(/[-–—]/.test(l)) return; // a dash usually separates a set name from its parallel, not part of a person's name
+    if(idx === yearLineIndex) return;
+    const letters = l.replace(/[^A-Za-z' ]/g, '').trim();
     const words = letters.split(/\s+/).filter(Boolean);
-    return words.length >= 1 && words.length <= 5 && !skipWords.test(line) && !/\d/.test(line) && letters.length >= 3
-      ? letters : null;
-  };
+    if(words.length < 1 || words.length > 4) return;
+    if(skipWords.test(l)) return;
+    if(/\d/.test(l)) return;
+    if(letters.length < 3) return;
+    candidates.push({ letters, wordCount: words.length, idx });
+  });
 
-  // Player name: on graded labels this is almost always the line right after the year/set line.
-  let playerCandidate = null;
-  if(yearLineIndex > -1 && lines[yearLineIndex + 1]){
-    playerCandidate = looksLikeName(lines[yearLineIndex + 1]);
-  }
-  // Fall back: longest name-like line anywhere, preferring all-caps ones (common on labels).
-  if(!playerCandidate){
-    let bestLine = '';
-    lines.forEach(l => {
-      const candidate = looksLikeName(l);
-      if(candidate && candidate.length > bestLine.length) bestLine = candidate;
-    });
-    playerCandidate = bestLine || null;
-  }
-  if(playerCandidate){
-    result.player = playerCandidate.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  // Prefer exactly two words (typical first + last name); break ties by proximity to the year line.
+  candidates.sort((a, b) => {
+    const scoreA = (a.wordCount === 2 ? 0 : 1) + (yearLineIndex > -1 ? Math.abs(a.idx - yearLineIndex) * 0.1 : 0);
+    const scoreB = (b.wordCount === 2 ? 0 : 1) + (yearLineIndex > -1 ? Math.abs(b.idx - yearLineIndex) * 0.1 : 0);
+    return scoreA - scoreB;
+  });
+
+  if(candidates.length){
+    result.player = candidates[0].letters.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
   }
 
   return result;
