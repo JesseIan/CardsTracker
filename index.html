@@ -998,7 +998,7 @@
         <div class="crop-handle br" data-corner="br"></div>
       </div>
     </div>
-    <p class="sub hidden" id="scanCropHint" style="margin-top:8px;">Drag the box over just the label, then tap "Scan text."</p>
+    <p class="sub hidden" id="scanCropHint" style="margin-top:8px;">Drag the box over the whole label — make sure the grading company's name (PSA, BGS, etc.) stays inside the box too, or it won't be detected. Then tap "Scan text."</p>
 
     <div id="scanStatus" class="sub hidden" style="margin-top:12px;"></div>
 
@@ -1241,7 +1241,7 @@ function initCropBox(){
   const rect = wrap.getBoundingClientRect();
   const w = rect.width, h = rect.height;
   // Default box: middle band of the image, roughly where a slab label usually sits
-  cropState = { x: w * 0.08, y: h * 0.12, w: w * 0.84, h: h * 0.3 };
+  cropState = { x: w * 0.04, y: h * 0.12, w: w * 0.92, h: h * 0.32 };
   updateCropBoxStyle();
   document.getElementById('scanCropWrap').classList.remove('hidden');
   document.getElementById('scanCropHint').classList.remove('hidden');
@@ -1399,11 +1399,17 @@ function parseCardText(rawText){
   if(numMatch) result.number = numMatch[1];
 
   // Grade — labels are two-column (description left, grade stacked right), so OCR often
-  // separates the quality word ("MINT") from its number ("9") onto different lines.
-  // Try adjacent match first, then fall back to finding an isolated number elsewhere.
+  // separates the quality word ("MINT") from its number ("9.5") onto different lines —
+  // and half-point grades ("9.5") sometimes get split further into "9" and "5" on
+  // separate lines if the decimal point is misread or dropped.
   let gradeNum = '';
   const qualAdjacent = text.match(new RegExp(qualRe.source + '\\s*([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
-  if(qualAdjacent){
+  const halfPointInline = text.match(/\b([1-9]|10)\s*[.,]\s*5\b/);
+  if(qualAdjacent && qualAdjacent[2].includes('.5')){
+    gradeNum = qualAdjacent[2];
+  }else if(halfPointInline){
+    gradeNum = `${halfPointInline[1]}.5`;
+  }else if(qualAdjacent){
     gradeNum = qualAdjacent[2];
   }else{
     const usedNumbers = new Set([result.number, result.year].filter(Boolean));
@@ -1412,17 +1418,24 @@ function parseCardText(rawText){
       (idx > 0 && subgradeWordsRe.test(lines[idx-1])) || (idx < lines.length-1 && subgradeWordsRe.test(lines[idx+1]));
 
     const gradeCandidates = [];
+    // Split half-point: a bare "6"-"10" line immediately followed by a bare "5" line
+    for(let i = 0; i < lines.length - 1; i++){
+      const a = lines[i].trim(), b = lines[i+1].trim();
+      if(/^([6-9]|10)$/.test(a) && b === '5' && !usedNumbers.has(a)){
+        gradeCandidates.push({ num: `${a}.5`, subAdj: isSubgradeAdjacent(i) || isSubgradeAdjacent(i+1), tier: 0 });
+      }
+    }
     lines.forEach((l, idx) => {
       const t = l.trim();
-      if(/^[0-9]{1,2}(\.5)?$/.test(t) && !usedNumbers.has(t)){
-        gradeCandidates.push({ num: t, subAdj: isSubgradeAdjacent(idx), tier: 0 });
+      if(/^[0-9]{1,2}(\.5)?$/.test(t) && !usedNumbers.has(t) && t !== '5'){
+        gradeCandidates.push({ num: t, subAdj: isSubgradeAdjacent(idx), tier: 1 });
       }
     });
     lines.forEach((l, idx) => {
       const t = l.trim();
       const m = t.match(/(?:^|\s)([0-9]{1,2}(?:\.5)?)$/);
       if(m && t !== m[1] && !usedNumbers.has(m[1])){
-        gradeCandidates.push({ num: m[1], subAdj: isSubgradeAdjacent(idx), tier: 1 });
+        gradeCandidates.push({ num: m[1], subAdj: isSubgradeAdjacent(idx), tier: 2 });
       }
     });
     gradeCandidates.sort((a, b) => (a.subAdj - b.subAdj) || (a.tier - b.tier));
