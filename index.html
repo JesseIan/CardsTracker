@@ -64,6 +64,29 @@
   }
   .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px;}
 
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:14px;
+  }
+  .user-welcome{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .user-welcome strong{color:var(--ink);font-weight:600;}
+  .btn-signout{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    padding:7px 16px;
+    border-radius:5px;
+    background:transparent;
+    border:1.5px solid var(--red);
+    color:var(--red-dark);
+    cursor:pointer;
+  }
+  .btn-signout:hover{background:var(--red);color:#fff;}
+
   /* ---------- scoreboard header ---------- */
   .scoreboard{
     background:var(--field);
@@ -345,16 +368,58 @@
   }
   .status-toggle input{width:auto;}
 
-  .photo-upload{display:flex;align-items:center;gap:12px;}
-  .photo-preview{
-    width:64px;height:64px;border-radius:6px;overflow:hidden;
-    background:#E4DECB;display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;border:1px solid var(--line-strong);
+  .photo-grid{display:flex;flex-wrap:wrap;gap:10px;}
+  .photo-tile{
+    width:88px;
+    border:1px solid var(--line-strong);
+    border-radius:6px;
+    overflow:hidden;
+    background:var(--paper);
+    display:flex;
+    flex-direction:column;
   }
-  .photo-preview img{width:100%;height:100%;object-fit:cover;}
-  .photo-preview span{font-size:9px;color:#A39B7E;font-family:'IBM Plex Mono',monospace;text-align:center;}
-  .photo-actions{display:flex;flex-direction:column;gap:6px;}
-  .photo-actions .icon-btn{flex:none;padding:6px 14px;}
+  .photo-tile .thumb{
+    width:100%;height:64px;
+    background:#E4DECB;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  .photo-tile .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-tile select{
+    font-size:10px;padding:4px;border:none;border-top:1px solid var(--line);
+    border-radius:0;background:var(--paper);
+  }
+  .photo-tile .remove-x{
+    text-align:center;font-size:10px;color:var(--red-dark);
+    padding:3px 0;cursor:pointer;border-top:1px solid var(--line);
+    font-family:'Inter',sans-serif;font-weight:600;
+  }
+  .photo-tile .remove-x:hover{background:rgba(166,61,64,0.1);}
+
+  .slab-photo{position:relative;}
+  .slab-photo .photo-count-badge{
+    position:absolute;bottom:6px;right:6px;
+    background:rgba(28,37,65,0.75);color:#F0EBDC;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;
+    padding:2px 7px;border-radius:10px;
+  }
+  .lightbox-caption{
+    position:absolute;bottom:20px;left:0;right:0;
+    text-align:center;color:#F0EBDC;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+    letter-spacing:0.5px;text-transform:uppercase;
+  }
+  .lightbox-nav{
+    position:absolute;top:50%;transform:translateY(-50%);
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.3);
+    color:#fff;width:40px;height:40px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;cursor:pointer;
+  }
+  .lightbox-nav:hover{background:rgba(255,255,255,0.24);}
+  .lightbox-nav.prev{left:16px;}
+  .lightbox-nav.next{right:16px;}
 
   .lightbox{
     position:fixed;inset:0;background:rgba(0,0,0,0.75);
@@ -417,12 +482,16 @@
 
 <div class="wrap hidden" id="appWrap">
 
+  <div class="topbar">
+    <div class="user-welcome" id="userWelcome"></div>
+    <button class="btn-signout" id="signOutBtn">Sign out</button>
+  </div>
+
   <div class="scoreboard">
     <div class="brand">
       <div class="brand-mark">Revival Cards</div>
       <div class="brand-sub">Card portfolio ledger</div>
     </div>
-    <button class="btn secondary" id="signOutBtn" style="align-self:flex-start;">Sign out</button>
     <div class="scoreboard-stats">
       <div class="sb-stat">
         <div class="sb-label">Invested</div>
@@ -480,15 +549,10 @@
     <div class="form-grid">
 
       <div class="field full">
-        <label>Photo (optional)</label>
-        <div class="photo-upload">
-          <div class="photo-preview" id="photoPreview"><span>No photo</span></div>
-          <div class="photo-actions">
-            <input type="file" id="f_photoInput" accept="image/*" style="display:none;">
-            <div class="icon-btn" id="photoUploadBtn">Upload photo</div>
-            <div class="icon-btn" id="photoRemoveBtn" style="display:none;">Remove</div>
-          </div>
-        </div>
+        <label>Photos (optional) — front, back, flaws, etc.</label>
+        <div class="photo-grid" id="photoGrid"></div>
+        <input type="file" id="f_photoInput" accept="image/*" multiple style="display:none;">
+        <div class="icon-btn" id="photoUploadBtn" style="flex:none;display:inline-block;padding:7px 14px;margin-top:8px;">+ Add photo</div>
       </div>
 
       <div class="field full">
@@ -603,7 +667,12 @@
   </div>
 </div>
 
-<div class="lightbox hidden" id="lightbox"><img id="lightboxImg" src=""></div>
+<div class="lightbox hidden" id="lightbox">
+  <div class="lightbox-nav prev" id="lightboxPrev">&#8249;</div>
+  <img id="lightboxImg" src="">
+  <div class="lightbox-nav next" id="lightboxNext">&#8250;</div>
+  <div class="lightbox-caption" id="lightboxCaption"></div>
+</div>
 
 <script>
 const STORAGE_KEY = 'portfolio';
@@ -611,7 +680,8 @@ const PHOTOS_KEY = 'photos';
 let cards = [];
 let photos = {};
 let editingId = null;
-let pendingPhoto = undefined;
+let modalPhotos = [];
+let removedPhotoIds = [];
 let portfolioChartInstance = null;
 let cardChartInstance = null;
 const BULK_COLS = ['player','sport','year','set','number','grade','purchasePrice','purchaseDate','value','soldDate','notes'];
@@ -684,6 +754,26 @@ function handleBulkPaste(e){
   });
 }
 
+function normalizeDate(str){
+  if(!str) return '';
+  str = str.trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  let m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){
+    let [, a, b, y] = m;
+    if(y.length === 2) y = (parseInt(y,10) < 50 ? '20' : '19') + y;
+    return `${y}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`;
+  }
+  m = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m){
+    const [, y, mo, d] = m;
+    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  const d = new Date(str);
+  if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return '';
+}
+
 function saveBulkCards(){
   const tbody = document.getElementById('bulkTableBody');
   const newCards = [];
@@ -697,8 +787,9 @@ function saveBulkCards(){
 
     const purchasePrice = parseFloat(rowData.purchasePrice) || 0;
     const value = parseFloat(rowData.value) || 0;
-    const isSold = !!rowData.soldDate;
-    const purchaseDate = rowData.purchaseDate || todayIso();
+    const normalizedSoldDate = normalizeDate(rowData.soldDate);
+    const isSold = !!normalizedSoldDate;
+    const purchaseDate = normalizeDate(rowData.purchaseDate) || todayIso();
 
     const card = {
       id: uid(),
@@ -714,12 +805,12 @@ function saveBulkCards(){
       status: isSold ? 'sold' : 'holding',
       currentValue: isSold ? 0 : value,
       soldPrice: isSold ? value : 0,
-      soldDate: isSold ? rowData.soldDate : '',
+      soldDate: isSold ? normalizedSoldDate : '',
       notes: rowData.notes,
       history: [{ date: purchaseDate, value: purchasePrice }]
     };
     if(isSold){
-      pushHistoryPoint(card, rowData.soldDate, value);
+      pushHistoryPoint(card, normalizedSoldDate, value);
     }else if(value && value !== purchasePrice){
       pushHistoryPoint(card, todayIso(), value);
     }
@@ -764,7 +855,12 @@ async function loadData(){
   try{
     photos = {};
     const photosSnap = await fb.getDocs(fb.collection(fb.db, 'users', currentUid, 'photos'));
-    photosSnap.forEach(d => { photos[d.id] = d.data().dataUrl; });
+    photosSnap.forEach(d => {
+      const data = d.data();
+      if(!photos[data.cardId]) photos[data.cardId] = [];
+      photos[data.cardId].push({ id: d.id, label: data.label || 'Photo', dataUrl: data.dataUrl, order: data.order || 0 });
+    });
+    Object.values(photos).forEach(arr => arr.sort((a,b) => a.order - b.order));
   }catch(e){
     console.error('Photo load error', e);
     photos = {};
@@ -776,14 +872,28 @@ async function saveData(){
   try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { portfolioJson: JSON.stringify(cards) }, { merge: true }); }
   catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
 }
-async function savePhotoFor(cardId, dataUrl){
+
+async function addPhotoDoc(cardId, label, dataUrl){
   const fb = window.__fb;
-  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid, 'photos', cardId), { dataUrl }); }
-  catch(e){ console.error('Photo save error', e); alert('Could not save photo — it may be too large, try a smaller image.'); }
+  const photoId = uid();
+  try{
+    await fb.setDoc(fb.doc(fb.db, 'users', currentUid, 'photos', photoId), { cardId, label, dataUrl, order: Date.now() });
+    return photoId;
+  }catch(e){
+    console.error('Photo save error', e);
+    const detail = (e && e.message) ? e.message : 'unknown error';
+    alert('Could not save a photo (' + detail + '). It may not have been saved — try a smaller image or check your connection.');
+    return null;
+  }
 }
-async function deletePhotoFor(cardId){
+async function updatePhotoLabelDoc(photoId, label){
   const fb = window.__fb;
-  try{ await fb.deleteDoc(fb.doc(fb.db, 'users', currentUid, 'photos', cardId)); }
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid, 'photos', photoId), { label }, { merge: true }); }
+  catch(e){ console.error('Photo label update error', e); }
+}
+async function deletePhotoDoc(photoId){
+  const fb = window.__fb;
+  try{ await fb.deleteDoc(fb.doc(fb.db, 'users', currentUid, 'photos', photoId)); }
   catch(e){ console.error('Photo delete error', e); }
 }
 
@@ -1001,13 +1111,15 @@ function renderSlab(c){
   const isSold = c.status === 'sold';
   const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
   const valueLabel = isSold ? 'Sold for' : 'Current value';
-  const photo = photos[c.id];
+  const cardPhotos = photos[c.id] || [];
+  const cover = cardPhotos[0];
 
   return `
     <div class="slab ${isSold ? 'sold' : ''}">
       ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
-      <div class="slab-photo" ${photo ? `onclick="openLightbox('${c.id}')"` : ''}>
-        ${photo ? `<img src="${photo}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
+      <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', 0)"` : ''}>
+        ${cover ? `<img src="${cover.dataUrl}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
+        ${cardPhotos.length > 1 ? `<span class="photo-count-badge">1 / ${cardPhotos.length}</span>` : ''}
       </div>
       <div class="slab-label">
         <div class="slab-label-left">
@@ -1042,17 +1154,29 @@ function renderAll(){
   renderPortfolioChart();
 }
 
-function updatePhotoPreview(){
-  const box = document.getElementById('photoPreview');
-  const removeBtn = document.getElementById('photoRemoveBtn');
-  const src = pendingPhoto !== undefined ? pendingPhoto : (editingId ? photos[editingId] : null);
-  if(src){
-    box.innerHTML = `<img src="${src}" alt="preview">`;
-    removeBtn.style.display = 'block';
-  }else{
-    box.innerHTML = `<span>No photo</span>`;
-    removeBtn.style.display = 'none';
-  }
+function renderModalPhotos(){
+  const grid = document.getElementById('photoGrid');
+  grid.innerHTML = modalPhotos.map((p, idx) => `
+    <div class="photo-tile">
+      <div class="thumb"><img src="${p.dataUrl}" alt="photo"></div>
+      <select onchange="setModalPhotoLabel(${idx}, this.value)">
+        ${['Front','Back','Flaw','Other'].map(l => `<option value="${l}" ${p.label===l?'selected':''}>${l}</option>`).join('')}
+      </select>
+      <div class="remove-x" onclick="removeModalPhoto(${idx})">Remove</div>
+    </div>
+  `).join('');
+}
+
+function setModalPhotoLabel(idx, label){
+  if(modalPhotos[idx]){ modalPhotos[idx].label = label; modalPhotos[idx].labelChanged = true; }
+}
+
+function removeModalPhoto(idx){
+  const p = modalPhotos[idx];
+  if(!p) return;
+  if(!p.isNew && p.id) removedPhotoIds.push(p.id);
+  modalPhotos.splice(idx, 1);
+  renderModalPhotos();
 }
 
 function resizeImage(file){
@@ -1061,14 +1185,23 @@ function resizeImage(file){
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const maxW = 480;
-        const scale = Math.min(1, maxW / img.width);
+        const maxDim = 900;
+        let width = img.width, height = img.height;
+        const scale = Math.min(1, maxDim / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
         const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        canvas.width = width;
+        canvas.height = height;
         const cx = canvas.getContext('2d');
-        cx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        cx.drawImage(img, 0, 0, width, height);
+        let quality = 0.82;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        while(dataUrl.length > 700000 && quality > 0.35){
+          quality -= 0.12;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl);
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -1080,7 +1213,6 @@ function resizeImage(file){
 
 function openModal(id){
   editingId = id || null;
-  pendingPhoto = undefined;
   const overlay = document.getElementById('modalOverlay');
   const title = document.getElementById('modalTitle');
   const sub = document.getElementById('modalSub');
@@ -1088,7 +1220,7 @@ function openModal(id){
   if(id){
     const c = cards.find(x => x.id === id);
     title.textContent = 'Edit card';
-    sub.textContent = 'Update details, mark it sold, or add a photo.';
+    sub.textContent = 'Update details, mark it sold, or manage photos.';
     document.getElementById('f_player').value = c.player || '';
     document.getElementById('f_sport').value = c.sport || '';
     document.getElementById('f_year').value = c.year || '';
@@ -1103,6 +1235,7 @@ function openModal(id){
     document.getElementById('f_notes').value = c.notes || '';
     document.getElementById('statusHolding').checked = c.status !== 'sold';
     document.getElementById('statusSold').checked = c.status === 'sold';
+    modalPhotos = (photos[id] || []).map(p => ({ id: p.id, label: p.label, dataUrl: p.dataUrl, isNew: false, labelChanged: false }));
   }else{
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
@@ -1111,17 +1244,20 @@ function openModal(id){
       document.getElementById(id).value = '';
     });
     document.getElementById('statusHolding').checked = true;
+    modalPhotos = [];
   }
+  removedPhotoIds = [];
   document.getElementById('f_photoInput').value = '';
   toggleSoldFields();
-  updatePhotoPreview();
+  renderModalPhotos();
   overlay.classList.remove('hidden');
 }
 
 function closeModal(){
   document.getElementById('modalOverlay').classList.add('hidden');
   editingId = null;
-  pendingPhoto = undefined;
+  modalPhotos = [];
+  removedPhotoIds = [];
 }
 
 function toggleSoldFields(){
@@ -1185,15 +1321,20 @@ async function saveCard(){
     });
   }
 
-  if(pendingPhoto !== undefined){
-    if(pendingPhoto === null){
-      delete photos[targetId];
-      await deletePhotoFor(targetId);
+  for(const pid of removedPhotoIds){
+    await deletePhotoDoc(pid);
+  }
+  const finalPhotos = [];
+  for(const item of modalPhotos){
+    if(item.isNew){
+      const newId = await addPhotoDoc(targetId, item.label, item.dataUrl);
+      if(newId) finalPhotos.push({ id: newId, label: item.label, dataUrl: item.dataUrl });
     }else{
-      photos[targetId] = pendingPhoto;
-      await savePhotoFor(targetId, pendingPhoto);
+      if(item.labelChanged) await updatePhotoLabelDoc(item.id, item.label);
+      finalPhotos.push({ id: item.id, label: item.label, dataUrl: item.dataUrl });
     }
   }
+  photos[targetId] = finalPhotos;
 
   await saveData();
   closeModal();
@@ -1203,16 +1344,36 @@ async function saveCard(){
 async function deleteCard(id){
   if(!confirm('Delete this card from your portfolio?')) return;
   cards = cards.filter(c => c.id !== id);
-  if(photos[id]){ delete photos[id]; await deletePhotoFor(id); }
+  const arr = photos[id] || [];
+  for(const p of arr){ await deletePhotoDoc(p.id); }
+  delete photos[id];
   await saveData();
   renderAll();
 }
 
-function openLightbox(id){
-  const src = photos[id];
-  if(!src) return;
-  document.getElementById('lightboxImg').src = src;
+let lightboxCardId = null;
+let lightboxIndex = 0;
+
+function openLightbox(id, index){
+  const arr = photos[id] || [];
+  if(arr.length === 0) return;
+  lightboxCardId = id;
+  lightboxIndex = index || 0;
+  renderLightbox();
   document.getElementById('lightbox').classList.remove('hidden');
+}
+
+function renderLightbox(){
+  const arr = photos[lightboxCardId] || [];
+  if(arr.length === 0) return;
+  if(lightboxIndex < 0) lightboxIndex = arr.length - 1;
+  if(lightboxIndex >= arr.length) lightboxIndex = 0;
+  const p = arr[lightboxIndex];
+  document.getElementById('lightboxImg').src = p.dataUrl;
+  document.getElementById('lightboxCaption').textContent = arr.length > 1 ? `${p.label} — ${lightboxIndex+1} / ${arr.length}` : p.label;
+  const showNav = arr.length > 1;
+  document.getElementById('lightboxPrev').style.display = showNav ? 'flex' : 'none';
+  document.getElementById('lightboxNext').style.display = showNav ? 'flex' : 'none';
 }
 
 document.getElementById('addBtn').addEventListener('click', () => openModal());
@@ -1231,18 +1392,20 @@ document.getElementById('photoUploadBtn').addEventListener('click', () => {
   document.getElementById('f_photoInput').click();
 });
 document.getElementById('f_photoInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  try{
-    pendingPhoto = await resizeImage(file);
-    updatePhotoPreview();
-  }catch(err){
-    console.error('Photo processing failed', err);
+  const files = Array.from(e.target.files || []);
+  if(files.length === 0) return;
+  const labelCycle = ['Front','Back','Flaw','Other'];
+  for(const file of files){
+    try{
+      const dataUrl = await resizeImage(file);
+      const defaultLabel = labelCycle[modalPhotos.length] || 'Other';
+      modalPhotos.push({ id: null, label: defaultLabel, dataUrl, isNew: true });
+    }catch(err){
+      console.error('Photo processing failed', err);
+    }
   }
-});
-document.getElementById('photoRemoveBtn').addEventListener('click', () => {
-  pendingPhoto = null;
-  updatePhotoPreview();
+  renderModalPhotos();
+  e.target.value = '';
 });
 
 document.getElementById('chartCloseBtn').addEventListener('click', () => {
@@ -1251,8 +1414,18 @@ document.getElementById('chartCloseBtn').addEventListener('click', () => {
 document.getElementById('chartModalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'chartModalOverlay') document.getElementById('chartModalOverlay').classList.add('hidden');
 });
-document.getElementById('lightbox').addEventListener('click', () => {
-  document.getElementById('lightbox').classList.add('hidden');
+document.getElementById('lightbox').addEventListener('click', (e) => {
+  if(e.target.id === 'lightbox') document.getElementById('lightbox').classList.add('hidden');
+});
+document.getElementById('lightboxPrev').addEventListener('click', (e) => {
+  e.stopPropagation();
+  lightboxIndex--;
+  renderLightbox();
+});
+document.getElementById('lightboxNext').addEventListener('click', (e) => {
+  e.stopPropagation();
+  lightboxIndex++;
+  renderLightbox();
 });
 
 document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
@@ -1264,6 +1437,12 @@ document.getElementById('bulkModalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'bulkModalOverlay') closeBulkModal();
 });
 document.getElementById('bulkTableBody').addEventListener('paste', handleBulkPaste);
+
+function nameFromEmail(email){
+  const local = (email.split('@')[0] || '').replace(/[._-]+/g, ' ').trim();
+  if(!local) return email;
+  return local.replace(/\b\w/g, ch => ch.toUpperCase());
+}
 
 function showAuthError(msg){
   const el = document.getElementById('authError');
@@ -1315,6 +1494,8 @@ function startApp(){
       document.getElementById('appWrap').classList.remove('hidden');
       document.getElementById('auth_password').value = '';
       clearAuthError();
+      const name = nameFromEmail(user.email || '');
+      document.getElementById('userWelcome').innerHTML = `Welcome, <strong>${name}</strong>`;
       await loadData();
       renderAll();
     }else{
