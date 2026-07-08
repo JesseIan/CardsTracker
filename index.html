@@ -122,6 +122,7 @@
   }
   .chart-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .chart-panel-head h3{font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;margin:0;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);}
+  #portfolioRangeFilter{font-size:12px;padding:5px 8px;}
   .chart-wrap{position:relative;height:220px;}
 
   /* ---------- controls ---------- */
@@ -512,6 +513,7 @@
   <div class="chart-panel">
     <div class="chart-panel-head">
       <h3>Portfolio value over time</h3>
+      <select id="portfolioRangeFilter"><option value="all">All time</option></select>
     </div>
     <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
   </div>
@@ -848,6 +850,9 @@ async function loadData(){
     const snap = await fb.getDoc(fb.doc(fb.db, 'users', currentUid));
     const raw = snap.exists() ? snap.data().portfolioJson : null;
     cards = raw ? JSON.parse(raw) : [];
+    let anyRepaired = false;
+    cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
+    if(anyRepaired) await saveData();
   }catch(e){
     console.error('Load error', e);
     cards = [];
@@ -865,6 +870,28 @@ async function loadData(){
     console.error('Photo load error', e);
     photos = {};
   }
+}
+
+function repairCardDates(card){
+  let changed = false;
+  if(card.purchaseDate){
+    const n = normalizeDate(card.purchaseDate);
+    if(n && n !== card.purchaseDate){ card.purchaseDate = n; changed = true; }
+  }
+  if(card.soldDate){
+    const n = normalizeDate(card.soldDate);
+    if(n && n !== card.soldDate){ card.soldDate = n; changed = true; }
+  }
+  if(Array.isArray(card.history) && card.history.length){
+    const map = {};
+    card.history.forEach(h => {
+      const n = normalizeDate(h.date) || h.date;
+      if(n !== h.date) changed = true;
+      map[n] = h.value;
+    });
+    card.history = Object.keys(map).sort().map(d => ({ date: d, value: map[d] }));
+  }
+  return changed;
 }
 
 async function saveData(){
@@ -921,6 +948,7 @@ function cardGainDollar(c){
 function pushHistoryPoint(c, date, value){
   if(!date) date = todayIso();
   if(!Array.isArray(c.history)) c.history = [];
+  date = normalizeDate(date) || date;
   const idx = c.history.findIndex(h => h.date === date);
   if(idx > -1) c.history[idx].value = value;
   else c.history.push({ date, value });
@@ -956,33 +984,86 @@ function renderSummary(){
   document.getElementById('statGainPct').textContent = fmtPct(gainPct);
 }
 
+function formatDateLabel(iso){
+  const parts = iso.split('-');
+  if(parts.length !== 3) return iso;
+  const dt = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
+  if(isNaN(dt.getTime())) return iso;
+  return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function populatePortfolioRangeOptions(){
+  const sel = document.getElementById('portfolioRangeFilter');
+  if(!sel) return;
+  const currentVal = sel.value || 'all';
+  const years = Array.from(new Set(cards.map(c => (normalizeDate(c.purchaseDate)||'').slice(0,4)).filter(Boolean))).sort().reverse();
+  let html = `
+    <option value="all">All time</option>
+    <option value="ytd">This year</option>
+    <option value="12m">Last 12 months</option>
+    <option value="3m">Last 3 months</option>
+    <option value="30d">Last 30 days</option>`;
+  years.forEach(y => { html += `<option value="year-${y}">${y}</option>`; });
+  sel.innerHTML = html;
+  if([...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
+}
+
+function getPortfolioRangeBounds(){
+  const sel = document.getElementById('portfolioRangeFilter');
+  const val = sel ? sel.value : 'all';
+  const today = new Date();
+  const toIso = (d) => d.toISOString().slice(0,10);
+  if(val === 'all') return { start: null, end: todayIso() };
+  if(val === 'ytd') return { start: `${today.getFullYear()}-01-01`, end: todayIso() };
+  if(val === '12m'){ const d = new Date(today); d.setDate(d.getDate()-365); return { start: toIso(d), end: todayIso() }; }
+  if(val === '3m'){ const d = new Date(today); d.setDate(d.getDate()-90); return { start: toIso(d), end: todayIso() }; }
+  if(val === '30d'){ const d = new Date(today); d.setDate(d.getDate()-30); return { start: toIso(d), end: todayIso() }; }
+  if(val.startsWith('year-')){
+    const y = val.slice(5);
+    const end = y === String(today.getFullYear()) ? todayIso() : `${y}-12-31`;
+    return { start: `${y}-01-01`, end };
+  }
+  return { start: null, end: todayIso() };
+}
+
+function totalAsOf(date, timelines){
+  let sum = 0;
+  timelines.forEach((tl, i) => {
+    const c = cards[i];
+    const pDate = normalizeDate(c.purchaseDate) || c.purchaseDate;
+    if(pDate && date < pDate) return;
+    let val = 0;
+    for(const p of tl){ if(p.date <= date) val = p.value; else break; }
+    sum += val;
+  });
+  return sum;
+}
+
 function renderPortfolioChart(){
   const ctx = document.getElementById('portfolioChart');
+  populatePortfolioRangeOptions();
+
   if(cards.length === 0){
     if(portfolioChartInstance){ portfolioChartInstance.destroy(); portfolioChartInstance = null; }
     return;
   }
 
   const timelines = cards.map(c => getCardTimeline(c));
-  const allDates = Array.from(new Set(timelines.flat().map(p => p.date))).sort();
+  const { start, end } = getPortfolioRangeBounds();
 
-  const totals = allDates.map(date => {
-    let sum = 0;
-    timelines.forEach((tl, i) => {
-      const c = cards[i];
-      if(c.purchaseDate && date < c.purchaseDate) return;
-      let val = 0;
-      for(const p of tl){ if(p.date <= date) val = p.value; else break; }
-      sum += val;
-    });
-    return sum;
-  });
+  let eventDates = Array.from(new Set(timelines.flat().map(p => p.date)));
+  eventDates = eventDates.filter(d => (!start || d >= start) && d <= end);
+  if(start) eventDates.push(start);
+  eventDates.push(end);
+  eventDates = Array.from(new Set(eventDates)).sort();
+
+  const totals = eventDates.map(date => totalAsOf(date, timelines));
 
   if(portfolioChartInstance) portfolioChartInstance.destroy();
   portfolioChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: allDates,
+      labels: eventDates.map(formatDateLabel),
       datasets: [{
         label: 'Portfolio value',
         data: totals,
@@ -990,7 +1071,7 @@ function renderPortfolioChart(){
         backgroundColor: 'rgba(184,137,43,0.12)',
         fill: true,
         tension: 0.2,
-        pointRadius: allDates.length > 20 ? 0 : 3,
+        pointRadius: eventDates.length > 20 ? 0 : 3,
         pointBackgroundColor: '#B8892B',
       }]
     },
@@ -1018,7 +1099,7 @@ function openCardChart(id){
   cardChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: tl.map(p => p.date),
+      labels: tl.map(p => formatDateLabel(p.date)),
       datasets: [{
         label: c.player,
         data: tl.map(p => p.value),
@@ -1387,6 +1468,7 @@ document.getElementById('modalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'modalOverlay') closeModal();
 });
 document.getElementById('filterSport').addEventListener('change', renderGrid);
+document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
 document.getElementById('sortBy').addEventListener('change', renderGrid);
 
