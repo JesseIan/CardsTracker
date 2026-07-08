@@ -431,6 +431,36 @@
     cursor:pointer;
   }
   .price-check-link:hover{text-decoration:underline;}
+
+  #scanCropWrap{
+    position:relative;
+    margin-top:12px;
+    max-width:100%;
+    display:inline-block;
+    line-height:0;
+  }
+  #scanPreviewImg{width:100%;max-width:460px;display:block;border-radius:6px;}
+  .crop-box{
+    position:absolute;
+    border:2px solid var(--gold);
+    background:rgba(184,137,43,0.18);
+    box-sizing:border-box;
+    touch-action:none;
+    cursor:move;
+  }
+  .crop-handle{
+    position:absolute;
+    width:20px;height:20px;
+    background:var(--gold);
+    border:2px solid #fff;
+    border-radius:50%;
+    touch-action:none;
+    box-shadow:0 1px 3px rgba(0,0,0,0.4);
+  }
+  .crop-handle.tl{top:-10px;left:-10px;cursor:nwse-resize;}
+  .crop-handle.tr{top:-10px;right:-10px;cursor:nesw-resize;}
+  .crop-handle.bl{bottom:-10px;left:-10px;cursor:nesw-resize;}
+  .crop-handle.br{bottom:-10px;right:-10px;cursor:nwse-resize;}
   .sold-flag{
     position:absolute;
     top:44px;
@@ -958,7 +988,17 @@
 
     <input type="file" id="scan_fileInput" accept="image/*" style="display:none;">
     <div id="scanChooseBtn" class="icon-btn" style="flex:none;display:inline-block;padding:9px 16px;">📷 Choose or take a photo</div>
-    <img id="scanPreviewImg" class="hidden" style="max-width:100%;border-radius:6px;margin-top:12px;display:block;">
+
+    <div id="scanCropWrap" class="hidden">
+      <img id="scanPreviewImg" draggable="false">
+      <div id="scanCropBox" class="crop-box">
+        <div class="crop-handle tl" data-corner="tl"></div>
+        <div class="crop-handle tr" data-corner="tr"></div>
+        <div class="crop-handle bl" data-corner="bl"></div>
+        <div class="crop-handle br" data-corner="br"></div>
+      </div>
+    </div>
+    <p class="sub hidden" id="scanCropHint" style="margin-top:8px;">Drag the box over just the label, then tap "Scan text."</p>
 
     <div id="scanStatus" class="sub hidden" style="margin-top:12px;"></div>
 
@@ -1103,7 +1143,6 @@ function getBulkCellInput(rowIndex, colIndex){
 }
 
 // ---------- Card scanner (on-device OCR) ----------
-let scanImageDataUrl = null;
 let scanImageFile = null;
 let tesseractLoadPromise = null;
 
@@ -1121,9 +1160,9 @@ function loadTesseract(){
 }
 
 function openScanModal(){
-  scanImageDataUrl = null;
   scanImageFile = null;
-  document.getElementById('scanPreviewImg').classList.add('hidden');
+  document.getElementById('scanCropWrap').classList.add('hidden');
+  document.getElementById('scanCropHint').classList.add('hidden');
   document.getElementById('scanPreviewImg').src = '';
   document.getElementById('scanStatus').classList.add('hidden');
   document.getElementById('scanResultsBox').classList.add('hidden');
@@ -1153,24 +1192,27 @@ function readFileAsDataUrl(file){
   });
 }
 
-function resizeForOcr(file){
+function cropAndPreprocessForOcr(file, crop){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
+        const sx = crop.xFrac * img.width;
+        const sy = crop.yFrac * img.height;
+        const sw = crop.wFrac * img.width;
+        const sh = crop.hFrac * img.height;
         const maxDim = 1800;
-        let w = img.width, h = img.height;
-        const scale = Math.min(1, maxDim / Math.max(w, h));
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
+        const scale = Math.min(3, maxDim / Math.max(sw, sh, 1));
+        const outW = Math.max(1, Math.round(sw * scale));
+        const outH = Math.max(1, Math.round(sh * scale));
         const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = outW;
+        canvas.height = outH;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
         // Grayscale + contrast boost — meaningfully improves OCR on photographed (not scanned) text
-        const imgData = ctx.getImageData(0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, outW, outH);
         const d = imgData.data;
         for(let i = 0; i < d.length; i += 4){
           const gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
@@ -1187,6 +1229,101 @@ function resizeForOcr(file){
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// ---------- Crop box drag/resize ----------
+let cropState = { x: 0, y: 0, w: 0, h: 0 };
+let cropDragMode = null;
+let cropDragStart = null;
+
+function initCropBox(){
+  const wrap = document.getElementById('scanCropWrap');
+  const rect = wrap.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  // Default box: middle band of the image, roughly where a slab label usually sits
+  cropState = { x: w * 0.08, y: h * 0.12, w: w * 0.84, h: h * 0.3 };
+  updateCropBoxStyle();
+  document.getElementById('scanCropWrap').classList.remove('hidden');
+  document.getElementById('scanCropHint').classList.remove('hidden');
+}
+
+function updateCropBoxStyle(){
+  const box = document.getElementById('scanCropBox');
+  box.style.left = cropState.x + 'px';
+  box.style.top = cropState.y + 'px';
+  box.style.width = cropState.w + 'px';
+  box.style.height = cropState.h + 'px';
+}
+
+function getCropFractions(){
+  const wrap = document.getElementById('scanCropWrap');
+  const rect = wrap.getBoundingClientRect();
+  return {
+    xFrac: Math.max(0, cropState.x / rect.width),
+    yFrac: Math.max(0, cropState.y / rect.height),
+    wFrac: Math.min(1, cropState.w / rect.width),
+    hFrac: Math.min(1, cropState.h / rect.height),
+  };
+}
+
+function setupCropDragHandlers(){
+  const box = document.getElementById('scanCropBox');
+  const minSize = 30;
+
+  box.addEventListener('pointerdown', (e) => {
+    if(e.target.classList.contains('crop-handle')) return;
+    cropDragMode = 'move';
+    cropDragStart = { px: e.clientX, py: e.clientY, ...cropState };
+    box.setPointerCapture(e.pointerId);
+  });
+
+  document.querySelectorAll('.crop-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      cropDragMode = handle.dataset.corner;
+      cropDragStart = { px: e.clientX, py: e.clientY, ...cropState };
+      handle.setPointerCapture(e.pointerId);
+    });
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if(!cropDragMode) return;
+    const wrap = document.getElementById('scanCropWrap');
+    const rect = wrap.getBoundingClientRect();
+    const dx = e.clientX - cropDragStart.px;
+    const dy = e.clientY - cropDragStart.py;
+
+    if(cropDragMode === 'move'){
+      cropState.x = Math.max(0, Math.min(rect.width - cropState.w, cropDragStart.x + dx));
+      cropState.y = Math.max(0, Math.min(rect.height - cropState.h, cropDragStart.y + dy));
+    }else{
+      let { x, y, w, h } = cropDragStart;
+      if(cropDragMode === 'br'){
+        w = Math.max(minSize, Math.min(rect.width - x, w + dx));
+        h = Math.max(minSize, Math.min(rect.height - y, h + dy));
+      }else if(cropDragMode === 'tr'){
+        w = Math.max(minSize, Math.min(rect.width - x, w + dx));
+        let newY = y + dy, newH = h - dy;
+        if(newH < minSize){ newH = minSize; newY = y + h - minSize; }
+        y = Math.max(0, newY); h = newH;
+      }else if(cropDragMode === 'bl'){
+        let newX = x + dx, newW = w - dx;
+        if(newW < minSize){ newW = minSize; newX = x + w - minSize; }
+        x = Math.max(0, newX); w = newW;
+        h = Math.max(minSize, Math.min(rect.height - y, h + dy));
+      }else if(cropDragMode === 'tl'){
+        let newX = x + dx, newW = w - dx;
+        if(newW < minSize){ newW = minSize; newX = x + w - minSize; }
+        let newY = y + dy, newH = h - dy;
+        if(newH < minSize){ newH = minSize; newY = y + h - minSize; }
+        x = Math.max(0, newX); y = Math.max(0, newY); w = newW; h = newH;
+      }
+      cropState = { x, y, w, h };
+    }
+    updateCropBoxStyle();
+  });
+
+  document.addEventListener('pointerup', () => { cropDragMode = null; });
 }
 
 async function runOcrOnImage(dataUrl, onProgress){
@@ -1208,14 +1345,16 @@ async function runOcrOnImage(dataUrl, onProgress){
 }
 
 async function runCardScan(){
-  if(!scanImageDataUrl) return;
+  if(!scanImageFile) return;
   const btn = document.getElementById('scanBtn');
   btn.disabled = true;
-  setScanStatus('Loading text scanner...');
+  setScanStatus('Cropping and loading text scanner...');
   try{
+    const cropFractions = getCropFractions();
+    const ocrImage = await cropAndPreprocessForOcr(scanImageFile, cropFractions);
     await loadTesseract();
     setScanStatus('Reading card — this can take a few seconds...');
-    const text = await runOcrOnImage(scanImageDataUrl, (pct) => {
+    const text = await runOcrOnImage(ocrImage, (pct) => {
       setScanStatus(`Reading card — ${Math.round(pct*100)}%...`);
     });
     const guesses = parseCardText(text);
@@ -2459,11 +2598,10 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
   if(!file) return;
   try{
     scanImageFile = file;
-    const [previewUrl, ocrUrl] = await Promise.all([readFileAsDataUrl(file), resizeForOcr(file)]);
-    scanImageDataUrl = ocrUrl;
+    const previewUrl = await readFileAsDataUrl(file);
     const img = document.getElementById('scanPreviewImg');
+    img.onload = () => { initCropBox(); };
     img.src = previewUrl;
-    img.classList.remove('hidden');
     document.getElementById('scanBtn').classList.remove('hidden');
     document.getElementById('scanResultsBox').classList.add('hidden');
     document.getElementById('scanUseBtn').classList.add('hidden');
@@ -2475,6 +2613,7 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
 });
 document.getElementById('scanBtn').addEventListener('click', runCardScan);
 document.getElementById('scanUseBtn').addEventListener('click', useScanResults);
+setupCropDragHandlers();
 
 document.getElementById('tabCollectionBtn').addEventListener('click', () => switchTab('collection'));
 document.getElementById('tabWatchlistBtn').addEventListener('click', () => switchTab('watchlist'));
