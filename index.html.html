@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revival Cards — Sports Card Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, deleteDoc,
+    collection, getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB93jhSgdQ20Fd8j1f7Q4qZ1DWkrPCNwjs",
+    authDomain: "revival-cards.firebaseapp.com",
+    projectId: "revival-cards",
+    storageBucket: "revival-cards.firebasestorage.app",
+    messagingSenderId: "377121270433",
+    appId: "1:377121270433:web:8f013f17ba69401c661ee0"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+
+  // Expose what the rest of the (non-module) app script needs
+  window.__fb = {
+    auth, db, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  };
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+  :root{
+    --cream:#F2ECDD;
+    --paper:#FBF7EC;
+    --ink:#1C2541;
+    --ink-soft:#3C4566;
+    --field:#2B4735;
+    --field-dark:#1E3326;
+    --gold:#B8892B;
+    --gold-dark:#8A6620;
+    --red:#A63D40;
+    --red-dark:#7A2C2E;
+    --line: rgba(28,37,65,0.14);
+    --line-strong: rgba(28,37,65,0.28);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px;}
+
+  /* ---------- scoreboard header ---------- */
+  .scoreboard{
+    background:var(--field);
+    background-image: linear-gradient(180deg, var(--field) 0%, var(--field-dark) 100%);
+    border-radius:6px;
+    padding:22px 28px;
+    color:#EDE7D6;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:16px;
+    border:1px solid rgba(0,0,0,0.25);
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand-mark{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;letter-spacing:0.5px;text-transform:uppercase;color:#F5F0E1;}
+  .brand-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#B9C4AE;}
+  .scoreboard-stats{display:flex;gap:28px;flex-wrap:wrap;}
+  .sb-stat{text-align:right;}
+  .sb-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#A9B79B;margin-bottom:4px;}
+  .sb-value{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;line-height:1;color:#F5F0E1;font-variant-numeric:tabular-nums;}
+  .sb-value.pos{color:#D9C27A;}
+  .sb-value.neg{color:#E39A9C;}
+  .sb-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:4px;color:#B9C4AE;}
+
+  /* ---------- portfolio chart panel ---------- */
+  .chart-panel{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:16px 18px 8px;
+    margin-top:20px;
+  }
+  .chart-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .chart-panel-head h3{font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;margin:0;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);}
+  .chart-wrap{position:relative;height:220px;}
+
+  /* ---------- controls ---------- */
+  .controls{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin:28px 0 18px;
+    flex-wrap:wrap;
+  }
+  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  select, input, textarea{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    padding:8px 10px;
+    border:1px solid var(--line-strong);
+    border-radius:4px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  select{cursor:pointer;}
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:9px 16px;
+    border-radius:4px;
+    border:1px solid var(--field);
+    background:var(--field);
+    color:#F5F0E1;
+    cursor:pointer;
+    letter-spacing:0.2px;
+  }
+  .btn:hover{background:var(--field-dark);}
+  .btn.secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--line-strong);
+  }
+  .btn.secondary:hover{background:rgba(28,37,65,0.06);}
+  .btn.danger{background:var(--red);border-color:var(--red);}
+  .btn.danger:hover{background:var(--red-dark);}
+
+  /* ---------- empty state ---------- */
+  .empty{
+    text-align:center;
+    padding:64px 20px;
+    border:1px dashed var(--line-strong);
+    border-radius:6px;
+    background:var(--paper);
+  }
+  .empty h3{font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;margin:0 0 8px;}
+  .empty p{color:var(--ink-soft);font-size:14px;margin:0 0 18px;}
+
+  /* ---------- slab grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(230px,1fr));
+    gap:18px;
+  }
+  .slab{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .slab.sold{opacity:0.72;}
+  .slab-photo{
+    width:100%;
+    height:130px;
+    background:#E4DECB;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    cursor:pointer;
+  }
+  .slab-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .slab-photo .ph-placeholder{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A39B7E;}
+  .slab-label{
+    background:var(--ink);
+    color:#F0EBDC;
+    padding:8px 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .slab-label-left{display:flex;flex-direction:column;}
+  .slab-cat{font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#9AA3C2;}
+  .slab-grade{font-size:9px;letter-spacing:1px;color:#C9CEE0;margin-top:2px;}
+  .roi-badge{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    padding:2px 8px;
+    border-radius:3px;
+    color:#1C2541;
+    background:#8A8F7A;
+  }
+  .roi-badge.pos{background:var(--gold);color:#3A2B0A;}
+  .roi-badge.neg{background:var(--red);color:#2D0D0E;}
+  .roi-badge.zero{background:#C9C4B0;color:#3A362A;}
+  .slab-body{padding:14px 14px 12px;flex:1;display:flex;flex-direction:column;gap:8px;}
+  .slab-title{font-family:'Oswald',sans-serif;font-size:16px;font-weight:500;line-height:1.25;color:var(--ink);}
+  .slab-meta{font-size:12px;color:var(--ink-soft);}
+  .slab-nums{
+    margin-top:4px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px 10px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+  }
+  .slab-nums div span{display:block;}
+  .num-label{color:var(--ink-soft);font-size:10px;text-transform:uppercase;letter-spacing:0.6px;}
+  .num-value{font-size:13px;color:var(--ink);margin-top:1px;}
+  .slab-notes{font-size:12px;color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--line);padding-top:8px;margin-top:2px;}
+  .slab-actions{
+    display:flex;
+    gap:8px;
+    padding:10px 14px;
+    border-top:1px solid var(--line);
+    background:rgba(28,37,65,0.03);
+  }
+  .icon-btn{
+    flex:1;
+    text-align:center;
+    font-size:12px;
+    padding:6px 0;
+    border-radius:4px;
+    border:1px solid var(--line-strong);
+    background:var(--paper);
+    color:var(--ink-soft);
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+  }
+  .icon-btn:hover{background:rgba(28,37,65,0.06);color:var(--ink);}
+  .sold-flag{
+    position:absolute;
+    top:44px;
+    right:-30px;
+    background:var(--red);
+    color:#F5E9E9;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:1.5px;
+    padding:3px 34px;
+    transform:rotate(35deg);
+    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+    z-index:2;
+  }
+
+  /* ---------- modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(28,37,65,0.45);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .modal-overlay.hidden{display:none;}
+  .modal{
+    background:var(--paper);
+    border-radius:8px;
+    width:100%;
+    max-width:520px;
+    max-height:88vh;
+    overflow-y:auto;
+    padding:22px 24px 24px;
+    border:1px solid var(--line-strong);
+  }
+  .modal.chart-modal{max-width:600px;}
+  .modal.bulk-modal{max-width:min(96vw, 1040px);}
+  .bulk-table-wrap{
+    overflow-x:auto;
+    border:1px solid var(--line-strong);
+    border-radius:6px;
+    max-height:360px;
+    overflow-y:auto;
+  }
+  table.bulk-table{border-collapse:collapse;width:100%;}
+  table.bulk-table th{
+    position:sticky;top:0;
+    background:var(--ink);
+    color:#E8E2CF;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    text-align:left;
+    padding:8px 8px;
+    white-space:nowrap;
+    z-index:1;
+  }
+  table.bulk-table td{
+    border-top:1px solid var(--line);
+    border-right:1px solid var(--line);
+    padding:0;
+  }
+  table.bulk-table td:last-child{border-right:none;}
+  table.bulk-table input{
+    width:100%;
+    border:none;
+    border-radius:0;
+    padding:7px 8px;
+    font-size:12px;
+    background:transparent;
+  }
+  table.bulk-table input:focus{
+    outline:2px solid var(--gold);
+    outline-offset:-2px;
+    background:#FFFDF6;
+  }
+  table.bulk-table tr:nth-child(even){background:rgba(28,37,65,0.025);}
+  .bulk-footer{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:12px;
+    flex-wrap:wrap;
+  }
+  .bulk-hint{font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;flex:1;min-width:220px;}
+  .modal h2{font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;margin:0 0 4px;}
+  .modal .sub{font-size:12px;color:var(--ink-soft);margin:0 0 18px;font-family:'IBM Plex Mono',monospace;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);font-weight:600;}
+  .field input, .field select, .field textarea{width:100%;}
+  .field textarea{resize:vertical;min-height:56px;font-family:'Inter',sans-serif;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+  .status-toggle{display:flex;gap:8px;margin-bottom:4px;}
+  .status-toggle label{
+    display:flex;align-items:center;gap:6px;
+    font-size:12px;color:var(--ink-soft);
+    border:1px solid var(--line-strong);
+    padding:6px 10px;border-radius:4px;cursor:pointer;
+  }
+  .status-toggle input{width:auto;}
+
+  .photo-upload{display:flex;align-items:center;gap:12px;}
+  .photo-preview{
+    width:64px;height:64px;border-radius:6px;overflow:hidden;
+    background:#E4DECB;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;border:1px solid var(--line-strong);
+  }
+  .photo-preview img{width:100%;height:100%;object-fit:cover;}
+  .photo-preview span{font-size:9px;color:#A39B7E;font-family:'IBM Plex Mono',monospace;text-align:center;}
+  .photo-actions{display:flex;flex-direction:column;gap:6px;}
+  .photo-actions .icon-btn{flex:none;padding:6px 14px;}
+
+  .lightbox{
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);
+    display:flex;align-items:center;justify-content:center;
+    z-index:60;padding:24px;cursor:zoom-out;
+  }
+  .lightbox img{max-width:100%;max-height:100%;border-radius:6px;}
+  .hidden{display:none !important;}
+
+  .auth-screen{
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .auth-card{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:28px 26px;
+    width:100%;
+    max-width:360px;
+  }
+  .auth-error{
+    background:rgba(166,61,64,0.1);
+    border:1px solid rgba(166,61,64,0.3);
+    color:var(--red-dark);
+    font-size:12px;
+    padding:8px 10px;
+    border-radius:4px;
+    margin-top:4px;
+  }
+
+  @media (max-width:600px){
+    .scoreboard{flex-direction:column;align-items:flex-start;}
+    .scoreboard-stats{width:100%;justify-content:space-between;gap:12px;}
+    .form-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="brand-mark" style="color:var(--ink);margin-bottom:2px;">Revival Cards</div>
+    <div class="brand-sub" style="color:var(--ink-soft);margin-bottom:20px;">Sign in to sync your portfolio across devices</div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Email</label>
+      <input type="email" id="auth_email" placeholder="you@example.com">
+    </div>
+    <div class="field" style="margin-bottom:6px;">
+      <label>Password</label>
+      <input type="password" id="auth_password" placeholder="At least 6 characters">
+    </div>
+    <div id="authError" class="auth-error hidden"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn secondary" id="authSignupBtn" style="flex:1;">Create account</button>
+      <button class="btn" id="authSigninBtn" style="flex:1;">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="appWrap">
+
+  <div class="scoreboard">
+    <div class="brand">
+      <div class="brand-mark">Revival Cards</div>
+      <div class="brand-sub">Card portfolio ledger</div>
+    </div>
+    <button class="btn secondary" id="signOutBtn" style="align-self:flex-start;">Sign out</button>
+    <div class="scoreboard-stats">
+      <div class="sb-stat">
+        <div class="sb-label">Invested</div>
+        <div class="sb-value" id="statInvested">$0</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-label">Current value</div>
+        <div class="sb-value" id="statValue">$0</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-label">Gain / loss</div>
+        <div class="sb-value" id="statGain">$0</div>
+        <div class="sb-sub" id="statGainPct">0.0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-panel">
+    <div class="chart-panel-head">
+      <h3>Portfolio value over time</h3>
+    </div>
+    <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
+  </div>
+
+  <div class="controls">
+    <div class="filters">
+      <select id="filterSport"><option value="all">All sports</option></select>
+      <select id="filterStatus">
+        <option value="all">All cards</option>
+        <option value="holding">Holding</option>
+        <option value="sold">Sold</option>
+      </select>
+      <select id="sortBy">
+        <option value="roi_desc">Sort: ROI (high to low)</option>
+        <option value="roi_asc">Sort: ROI (low to high)</option>
+        <option value="value_desc">Sort: current value</option>
+        <option value="date_desc">Sort: recently added</option>
+        <option value="date_asc">Sort: oldest added</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
+      <button class="btn" id="addBtn">+ Add card</button>
+    </div>
+  </div>
+
+  <div id="gridArea"></div>
+
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add a card</h2>
+    <p class="sub" id="modalSub">Enter what you paid and what it's worth now.</p>
+    <div class="form-grid">
+
+      <div class="field full">
+        <label>Photo (optional)</label>
+        <div class="photo-upload">
+          <div class="photo-preview" id="photoPreview"><span>No photo</span></div>
+          <div class="photo-actions">
+            <input type="file" id="f_photoInput" accept="image/*" style="display:none;">
+            <div class="icon-btn" id="photoUploadBtn">Upload photo</div>
+            <div class="icon-btn" id="photoRemoveBtn" style="display:none;">Remove</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field full">
+        <label>Player / card name</label>
+        <input type="text" id="f_player" placeholder="e.g. Victor Wembanyama">
+      </div>
+      <div class="field">
+        <label>Sport</label>
+        <input type="text" id="f_sport" placeholder="Basketball">
+      </div>
+      <div class="field">
+        <label>Year</label>
+        <input type="text" id="f_year" placeholder="2023">
+      </div>
+      <div class="field">
+        <label>Set / product</label>
+        <input type="text" id="f_set" placeholder="Panini Prizm">
+      </div>
+      <div class="field">
+        <label>Card #</label>
+        <input type="text" id="f_number" placeholder="#1">
+      </div>
+      <div class="field full">
+        <label>Grading</label>
+        <input type="text" id="f_grade" placeholder="PSA 10, BGS 9.5, or Raw">
+      </div>
+      <div class="field">
+        <label>Purchase price ($)</label>
+        <input type="number" id="f_purchasePrice" step="0.01" placeholder="150.00">
+      </div>
+      <div class="field">
+        <label>Purchase date</label>
+        <input type="date" id="f_purchaseDate">
+      </div>
+
+      <div class="field full">
+        <div class="status-toggle">
+          <label><input type="radio" name="status" value="holding" id="statusHolding" checked> Still holding</label>
+          <label><input type="radio" name="status" value="sold" id="statusSold"> Sold</label>
+        </div>
+      </div>
+
+      <div class="field" id="wrap_currentValue">
+        <label>Current market value ($)</label>
+        <input type="number" id="f_currentValue" step="0.01" placeholder="220.00">
+      </div>
+      <div class="field" id="wrap_soldPrice" style="display:none;">
+        <label>Sold price ($)</label>
+        <input type="number" id="f_soldPrice" step="0.01" placeholder="240.00">
+      </div>
+      <div class="field" id="wrap_soldDate" style="display:none;">
+        <label>Sold date</label>
+        <input type="date" id="f_soldDate">
+      </div>
+
+      <div class="field full">
+        <label>Notes (optional)</label>
+        <textarea id="f_notes" placeholder="Where you bought it, condition notes, etc."></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cancelBtn">Cancel</button>
+      <button class="btn" id="saveBtn">Save card</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="bulkModalOverlay">
+  <div class="modal bulk-modal">
+    <h2>Bulk add cards</h2>
+    <p class="sub">Type into the grid, or paste rows straight from a spreadsheet. Only rows with a player name are added.</p>
+    <div class="bulk-table-wrap">
+      <table class="bulk-table" id="bulkTable">
+        <thead>
+          <tr>
+            <th style="min-width:160px;">Player *</th>
+            <th style="min-width:100px;">Sport</th>
+            <th style="min-width:70px;">Year</th>
+            <th style="min-width:130px;">Set</th>
+            <th style="min-width:70px;">Card #</th>
+            <th style="min-width:100px;">Grade</th>
+            <th style="min-width:90px;">Paid ($)</th>
+            <th style="min-width:110px;">Purchase date</th>
+            <th style="min-width:90px;">Value ($)</th>
+            <th style="min-width:110px;">Sold date</th>
+            <th style="min-width:140px;">Notes</th>
+          </tr>
+        </thead>
+        <tbody id="bulkTableBody"></tbody>
+      </table>
+    </div>
+    <div class="bulk-footer">
+      <button class="icon-btn" id="bulkAddRowBtn" style="flex:none;padding:8px 16px;">+ Add row</button>
+      <button class="icon-btn" id="bulkClearBtn" style="flex:none;padding:8px 16px;">Clear grid</button>
+      <span class="bulk-hint">Tip: leave "Sold date" blank for cards you're still holding — "Value" will be treated as current market value. Fill "Sold date" and "Value" becomes the sale price.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="bulkCancelBtn">Cancel</button>
+      <button class="btn" id="bulkSaveBtn">Add all cards</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="chartModalOverlay">
+  <div class="modal chart-modal">
+    <h2 id="chartModalTitle">Card value history</h2>
+    <p class="sub" id="chartModalSub"></p>
+    <div class="chart-wrap" style="height:260px;"><canvas id="cardChart"></canvas></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="chartCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox hidden" id="lightbox"><img id="lightboxImg" src=""></div>
+
+<script>
+const STORAGE_KEY = 'portfolio';
+const PHOTOS_KEY = 'photos';
+let cards = [];
+let photos = {};
+let editingId = null;
+let pendingPhoto = undefined;
+let portfolioChartInstance = null;
+let cardChartInstance = null;
+const BULK_COLS = ['player','sport','year','set','number','grade','purchasePrice','purchaseDate','value','soldDate','notes'];
+const BULK_MIN_ROWS = 8;
+
+function bulkRowCount(){
+  return document.getElementById('bulkTableBody').children.length;
+}
+
+function addBulkRow(){
+  const tbody = document.getElementById('bulkTableBody');
+  const rowIndex = tbody.children.length;
+  const tr = document.createElement('tr');
+  tr.dataset.rowIndex = rowIndex;
+  tr.innerHTML = BULK_COLS.map((col, colIndex) => {
+    const type = (col === 'purchasePrice' || col === 'value') ? 'text' : 'text';
+    return `<td data-col-index="${colIndex}"><input type="${type}" data-col="${col}"></td>`;
+  }).join('');
+  tbody.appendChild(tr);
+}
+
+function resetBulkGrid(){
+  document.getElementById('bulkTableBody').innerHTML = '';
+  for(let i=0;i<BULK_MIN_ROWS;i++) addBulkRow();
+}
+
+function getBulkCellInput(rowIndex, colIndex){
+  const tbody = document.getElementById('bulkTableBody');
+  const row = tbody.children[rowIndex];
+  if(!row) return null;
+  const cell = row.children[colIndex];
+  if(!cell) return null;
+  return cell.querySelector('input');
+}
+
+function openBulkModal(){
+  resetBulkGrid();
+  document.getElementById('bulkModalOverlay').classList.remove('hidden');
+}
+function closeBulkModal(){
+  document.getElementById('bulkModalOverlay').classList.add('hidden');
+}
+
+function handleBulkPaste(e){
+  const active = document.activeElement;
+  if(!active || active.tagName !== 'INPUT') return;
+  const cell = active.closest('td');
+  const row = active.closest('tr');
+  if(!cell || !row) return;
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if(!text || text.indexOf('\t') === -1 && text.indexOf('\n') === -1){
+    return; // plain single-cell paste, let the browser handle it normally
+  }
+  e.preventDefault();
+  let rows = text.split(/\r\n|\n|\r/);
+  if(rows.length > 1 && rows[rows.length-1] === '') rows.pop();
+  const startRow = parseInt(row.dataset.rowIndex, 10);
+  const startCol = parseInt(cell.dataset.colIndex, 10);
+
+  rows.forEach((rowText, rOffset) => {
+    const targetRow = startRow + rOffset;
+    while(targetRow >= bulkRowCount()) addBulkRow();
+    const cols = rowText.split('\t');
+    cols.forEach((val, cOffset) => {
+      const targetCol = startCol + cOffset;
+      if(targetCol >= BULK_COLS.length) return;
+      const input = getBulkCellInput(targetRow, targetCol);
+      if(input) input.value = val.trim();
+    });
+  });
+}
+
+function saveBulkCards(){
+  const tbody = document.getElementById('bulkTableBody');
+  const newCards = [];
+  Array.from(tbody.children).forEach(row => {
+    const rowData = {};
+    BULK_COLS.forEach((col, colIndex) => {
+      const input = row.children[colIndex].querySelector('input');
+      rowData[col] = input ? input.value.trim() : '';
+    });
+    if(!rowData.player) return;
+
+    const purchasePrice = parseFloat(rowData.purchasePrice) || 0;
+    const value = parseFloat(rowData.value) || 0;
+    const isSold = !!rowData.soldDate;
+    const purchaseDate = rowData.purchaseDate || todayIso();
+
+    const card = {
+      id: uid(),
+      createdAt: Date.now(),
+      player: rowData.player,
+      sport: rowData.sport,
+      year: rowData.year,
+      set: rowData.set,
+      number: rowData.number,
+      grade: rowData.grade,
+      purchasePrice,
+      purchaseDate,
+      status: isSold ? 'sold' : 'holding',
+      currentValue: isSold ? 0 : value,
+      soldPrice: isSold ? value : 0,
+      soldDate: isSold ? rowData.soldDate : '',
+      notes: rowData.notes,
+      history: [{ date: purchaseDate, value: purchasePrice }]
+    };
+    if(isSold){
+      pushHistoryPoint(card, rowData.soldDate, value);
+    }else if(value && value !== purchasePrice){
+      pushHistoryPoint(card, todayIso(), value);
+    }
+    newCards.push(card);
+  });
+
+  if(newCards.length === 0){
+    closeBulkModal();
+    return;
+  }
+
+  cards = cards.concat(newCards);
+  saveData().then(() => {
+    closeBulkModal();
+    renderAll();
+  });
+}
+
+const fmtMoney = (n) => {
+  const v = Number(n) || 0;
+  return v.toLocaleString('en-US', { style:'currency', currency:'USD', maximumFractionDigits: v % 1 === 0 ? 0 : 2 });
+};
+const fmtPct = (n) => {
+  const v = Number(n) || 0;
+  return (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+};
+const uid = () => 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const todayIso = () => new Date().toISOString().slice(0,10);
+
+let currentUid = null;
+
+async function loadData(){
+  const fb = window.__fb;
+  try{
+    const snap = await fb.getDoc(fb.doc(fb.db, 'users', currentUid));
+    const raw = snap.exists() ? snap.data().portfolioJson : null;
+    cards = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    console.error('Load error', e);
+    cards = [];
+  }
+  try{
+    photos = {};
+    const photosSnap = await fb.getDocs(fb.collection(fb.db, 'users', currentUid, 'photos'));
+    photosSnap.forEach(d => { photos[d.id] = d.data().dataUrl; });
+  }catch(e){
+    console.error('Photo load error', e);
+    photos = {};
+  }
+}
+
+async function saveData(){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { portfolioJson: JSON.stringify(cards) }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
+}
+async function savePhotoFor(cardId, dataUrl){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid, 'photos', cardId), { dataUrl }); }
+  catch(e){ console.error('Photo save error', e); alert('Could not save photo — it may be too large, try a smaller image.'); }
+}
+async function deletePhotoFor(cardId){
+  const fb = window.__fb;
+  try{ await fb.deleteDoc(fb.doc(fb.db, 'users', currentUid, 'photos', cardId)); }
+  catch(e){ console.error('Photo delete error', e); }
+}
+
+function cardRoi(c){
+  if(c.status === 'sold'){
+    const paid = Number(c.purchasePrice) || 0;
+    const got = Number(c.soldPrice) || 0;
+    if(paid === 0) return 0;
+    return ((got - paid) / paid) * 100;
+  }else{
+    const paid = Number(c.purchasePrice) || 0;
+    const now = Number(c.currentValue) || 0;
+    if(paid === 0) return 0;
+    return ((now - paid) / paid) * 100;
+  }
+}
+
+function cardGainDollar(c){
+  if(c.status === 'sold'){
+    return (Number(c.soldPrice)||0) - (Number(c.purchasePrice)||0);
+  }
+  return (Number(c.currentValue)||0) - (Number(c.purchasePrice)||0);
+}
+
+function pushHistoryPoint(c, date, value){
+  if(!date) date = todayIso();
+  if(!Array.isArray(c.history)) c.history = [];
+  const idx = c.history.findIndex(h => h.date === date);
+  if(idx > -1) c.history[idx].value = value;
+  else c.history.push({ date, value });
+  c.history.sort((a,b) => a.date.localeCompare(b.date));
+}
+
+function getCardTimeline(c){
+  const hist = Array.isArray(c.history) ? c.history.slice() : [];
+  if(hist.length === 0){
+    hist.push({ date: c.purchaseDate || todayIso(), value: Number(c.purchasePrice)||0 });
+  }
+  const liveDate = c.status === 'sold' ? (c.soldDate || todayIso()) : todayIso();
+  const liveValue = c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+  const last = hist[hist.length - 1];
+  if(!last || last.date !== liveDate || last.value !== liveValue){
+    hist.push({ date: liveDate, value: liveValue });
+  }
+  hist.sort((a,b) => a.date.localeCompare(b.date));
+  return hist;
+}
+
+function renderSummary(){
+  const invested = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const value = cards.reduce((s,c)=> s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+  const gain = value - invested;
+  const gainPct = invested === 0 ? 0 : (gain / invested) * 100;
+
+  document.getElementById('statInvested').textContent = fmtMoney(invested);
+  document.getElementById('statValue').textContent = fmtMoney(value);
+  const gainEl = document.getElementById('statGain');
+  gainEl.textContent = (gain >= 0 ? '+' : '') + fmtMoney(gain);
+  gainEl.className = 'sb-value ' + (gain > 0 ? 'pos' : gain < 0 ? 'neg' : '');
+  document.getElementById('statGainPct').textContent = fmtPct(gainPct);
+}
+
+function renderPortfolioChart(){
+  const ctx = document.getElementById('portfolioChart');
+  if(cards.length === 0){
+    if(portfolioChartInstance){ portfolioChartInstance.destroy(); portfolioChartInstance = null; }
+    return;
+  }
+
+  const timelines = cards.map(c => getCardTimeline(c));
+  const allDates = Array.from(new Set(timelines.flat().map(p => p.date))).sort();
+
+  const totals = allDates.map(date => {
+    let sum = 0;
+    timelines.forEach((tl, i) => {
+      const c = cards[i];
+      if(c.purchaseDate && date < c.purchaseDate) return;
+      let val = 0;
+      for(const p of tl){ if(p.date <= date) val = p.value; else break; }
+      sum += val;
+    });
+    return sum;
+  });
+
+  if(portfolioChartInstance) portfolioChartInstance.destroy();
+  portfolioChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allDates,
+      datasets: [{
+        label: 'Portfolio value',
+        data: totals,
+        borderColor: '#B8892B',
+        backgroundColor: 'rgba(184,137,43,0.12)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: allDates.length > 20 ? 0 : 3,
+        pointBackgroundColor: '#B8892B',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: (v) => '$' + v.toLocaleString() } },
+        x: { ticks: { maxTicksLimit: 8 } }
+      }
+    }
+  });
+}
+
+function openCardChart(id){
+  const c = cards.find(x => x.id === id);
+  if(!c) return;
+  const tl = getCardTimeline(c);
+  document.getElementById('chartModalTitle').textContent = c.player + ' — value history';
+  document.getElementById('chartModalSub').textContent = (c.sport || '') + (c.year ? ' · ' + c.year : '');
+
+  const ctx = document.getElementById('cardChart');
+  if(cardChartInstance) cardChartInstance.destroy();
+  cardChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: tl.map(p => p.date),
+      datasets: [{
+        label: c.player,
+        data: tl.map(p => p.value),
+        borderColor: '#2B4735',
+        backgroundColor: 'rgba(43,71,53,0.12)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 4,
+        pointBackgroundColor: '#2B4735',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: (v) => '$' + v.toLocaleString() } }
+      }
+    }
+  });
+
+  document.getElementById('chartModalOverlay').classList.remove('hidden');
+}
+
+function populateSportFilter(){
+  const sel = document.getElementById('filterSport');
+  const current = sel.value || 'all';
+  const sports = Array.from(new Set(cards.map(c => (c.sport||'').trim()).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="all">All sports</option>' + sports.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  sel.value = sports.includes(current) ? current : 'all';
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function getFilteredSorted(){
+  const sport = document.getElementById('filterSport').value;
+  const status = document.getElementById('filterStatus').value;
+  const sortBy = document.getElementById('sortBy').value;
+
+  let list = cards.filter(c => {
+    if(sport !== 'all' && (c.sport||'') !== sport) return false;
+    if(status !== 'all' && c.status !== status) return false;
+    return true;
+  });
+
+  list.sort((a,b) => {
+    if(sortBy === 'roi_desc') return cardRoi(b) - cardRoi(a);
+    if(sortBy === 'roi_asc') return cardRoi(a) - cardRoi(b);
+    if(sortBy === 'value_desc'){
+      const va = a.status === 'sold' ? Number(a.soldPrice)||0 : Number(a.currentValue)||0;
+      const vb = b.status === 'sold' ? Number(b.soldPrice)||0 : Number(b.currentValue)||0;
+      return vb - va;
+    }
+    if(sortBy === 'date_desc') return (b.createdAt||0) - (a.createdAt||0);
+    if(sortBy === 'date_asc') return (a.createdAt||0) - (b.createdAt||0);
+    return 0;
+  });
+
+  return list;
+}
+
+function renderGrid(){
+  const area = document.getElementById('gridArea');
+  const list = getFilteredSorted();
+
+  if(cards.length === 0){
+    area.innerHTML = `
+      <div class="empty">
+        <h3>Your case is empty</h3>
+        <p>Add your first card to start tracking its value over time.</p>
+        <button class="btn" onclick="openModal()">+ Add card</button>
+      </div>`;
+    return;
+  }
+
+  if(list.length === 0){
+    area.innerHTML = `<div class="empty"><h3>No cards match these filters</h3><p>Try a different sport or status.</p></div>`;
+    return;
+  }
+
+  area.innerHTML = `<div class="grid">${list.map(renderSlab).join('')}</div>`;
+}
+
+function renderSlab(c){
+  const roi = cardRoi(c);
+  const gain = cardGainDollar(c);
+  const roiClass = roi > 0 ? 'pos' : roi < 0 ? 'neg' : 'zero';
+  const isSold = c.status === 'sold';
+  const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+  const valueLabel = isSold ? 'Sold for' : 'Current value';
+  const photo = photos[c.id];
+
+  return `
+    <div class="slab ${isSold ? 'sold' : ''}">
+      ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
+      <div class="slab-photo" ${photo ? `onclick="openLightbox('${c.id}')"` : ''}>
+        ${photo ? `<img src="${photo}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
+      </div>
+      <div class="slab-label">
+        <div class="slab-label-left">
+          <span class="slab-cat">${escapeHtml(c.sport || 'Card')}</span>
+          <span class="slab-grade">${escapeHtml(c.grade || 'Raw')}</span>
+        </div>
+        <div class="roi-badge ${roiClass}">${fmtPct(roi)}</div>
+      </div>
+      <div class="slab-body">
+        <div class="slab-title">${escapeHtml(c.player || 'Untitled card')}</div>
+        <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}</div>
+        <div class="slab-nums">
+          <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
+          <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
+          <div><span class="num-label">Gain / loss</span><span class="num-value">${(gain>=0?'+':'') + fmtMoney(gain)}</span></div>
+          <div><span class="num-label">${isSold ? 'Sold' : 'Purchased'}</span><span class="num-value">${escapeHtml((isSold ? c.soldDate : c.purchaseDate) || '—')}</span></div>
+        </div>
+        ${c.notes ? `<div class="slab-notes">${escapeHtml(c.notes)}</div>` : ''}
+      </div>
+      <div class="slab-actions">
+        <div class="icon-btn" onclick="openCardChart('${c.id}')">Chart</div>
+        <div class="icon-btn" onclick="openModal('${c.id}')">Edit</div>
+        <div class="icon-btn" onclick="deleteCard('${c.id}')">Delete</div>
+      </div>
+    </div>`;
+}
+
+function renderAll(){
+  renderSummary();
+  populateSportFilter();
+  renderGrid();
+  renderPortfolioChart();
+}
+
+function updatePhotoPreview(){
+  const box = document.getElementById('photoPreview');
+  const removeBtn = document.getElementById('photoRemoveBtn');
+  const src = pendingPhoto !== undefined ? pendingPhoto : (editingId ? photos[editingId] : null);
+  if(src){
+    box.innerHTML = `<img src="${src}" alt="preview">`;
+    removeBtn.style.display = 'block';
+  }else{
+    box.innerHTML = `<span>No photo</span>`;
+    removeBtn.style.display = 'none';
+  }
+}
+
+function resizeImage(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 480;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const cx = canvas.getContext('2d');
+        cx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function openModal(id){
+  editingId = id || null;
+  pendingPhoto = undefined;
+  const overlay = document.getElementById('modalOverlay');
+  const title = document.getElementById('modalTitle');
+  const sub = document.getElementById('modalSub');
+
+  if(id){
+    const c = cards.find(x => x.id === id);
+    title.textContent = 'Edit card';
+    sub.textContent = 'Update details, mark it sold, or add a photo.';
+    document.getElementById('f_player').value = c.player || '';
+    document.getElementById('f_sport').value = c.sport || '';
+    document.getElementById('f_year').value = c.year || '';
+    document.getElementById('f_set').value = c.set || '';
+    document.getElementById('f_number').value = c.number || '';
+    document.getElementById('f_grade').value = c.grade || '';
+    document.getElementById('f_purchasePrice').value = c.purchasePrice ?? '';
+    document.getElementById('f_purchaseDate').value = c.purchaseDate || '';
+    document.getElementById('f_currentValue').value = c.currentValue ?? '';
+    document.getElementById('f_soldPrice').value = c.soldPrice ?? '';
+    document.getElementById('f_soldDate').value = c.soldDate || '';
+    document.getElementById('f_notes').value = c.notes || '';
+    document.getElementById('statusHolding').checked = c.status !== 'sold';
+    document.getElementById('statusSold').checked = c.status === 'sold';
+  }else{
+    title.textContent = 'Add a card';
+    sub.textContent = "Enter what you paid and what it's worth now.";
+    ['f_player','f_sport','f_year','f_set','f_number','f_grade','f_purchasePrice',
+     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('statusHolding').checked = true;
+  }
+  document.getElementById('f_photoInput').value = '';
+  toggleSoldFields();
+  updatePhotoPreview();
+  overlay.classList.remove('hidden');
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.add('hidden');
+  editingId = null;
+  pendingPhoto = undefined;
+}
+
+function toggleSoldFields(){
+  const sold = document.getElementById('statusSold').checked;
+  document.getElementById('wrap_currentValue').style.display = sold ? 'none' : 'flex';
+  document.getElementById('wrap_soldPrice').style.display = sold ? 'flex' : 'none';
+  document.getElementById('wrap_soldDate').style.display = sold ? 'flex' : 'none';
+}
+
+async function saveCard(){
+  const player = document.getElementById('f_player').value.trim();
+  if(!player){
+    document.getElementById('f_player').focus();
+    return;
+  }
+  const status = document.getElementById('statusSold').checked ? 'sold' : 'holding';
+
+  const data = {
+    player,
+    sport: document.getElementById('f_sport').value.trim(),
+    year: document.getElementById('f_year').value.trim(),
+    set: document.getElementById('f_set').value.trim(),
+    number: document.getElementById('f_number').value.trim(),
+    grade: document.getElementById('f_grade').value.trim(),
+    purchasePrice: parseFloat(document.getElementById('f_purchasePrice').value) || 0,
+    purchaseDate: document.getElementById('f_purchaseDate').value,
+    status,
+    currentValue: parseFloat(document.getElementById('f_currentValue').value) || 0,
+    soldPrice: parseFloat(document.getElementById('f_soldPrice').value) || 0,
+    soldDate: document.getElementById('f_soldDate').value,
+    notes: document.getElementById('f_notes').value.trim(),
+  };
+
+  let targetId = editingId;
+
+  if(editingId){
+    const idx = cards.findIndex(c => c.id === editingId);
+    if(idx > -1){
+      const old = cards[idx];
+      const merged = { ...old, ...data, history: old.history };
+      if(!Array.isArray(merged.history) || merged.history.length === 0){
+        merged.history = [{ date: merged.purchaseDate || todayIso(), value: merged.purchasePrice }];
+      }else if(old.purchasePrice !== merged.purchasePrice || old.purchaseDate !== merged.purchaseDate){
+        pushHistoryPoint(merged, merged.purchaseDate || todayIso(), merged.purchasePrice);
+      }
+      if(merged.status === 'holding' && old.currentValue !== merged.currentValue){
+        pushHistoryPoint(merged, todayIso(), merged.currentValue);
+      }
+      if(merged.status === 'sold' && (old.soldPrice !== merged.soldPrice || old.soldDate !== merged.soldDate || old.status !== 'sold')){
+        pushHistoryPoint(merged, merged.soldDate || todayIso(), merged.soldPrice);
+      }
+      cards[idx] = merged;
+    }
+  }else{
+    targetId = uid();
+    cards.push({
+      id: targetId,
+      createdAt: Date.now(),
+      history: [{ date: data.purchaseDate || todayIso(), value: data.purchasePrice }],
+      ...data
+    });
+  }
+
+  if(pendingPhoto !== undefined){
+    if(pendingPhoto === null){
+      delete photos[targetId];
+      await deletePhotoFor(targetId);
+    }else{
+      photos[targetId] = pendingPhoto;
+      await savePhotoFor(targetId, pendingPhoto);
+    }
+  }
+
+  await saveData();
+  closeModal();
+  renderAll();
+}
+
+async function deleteCard(id){
+  if(!confirm('Delete this card from your portfolio?')) return;
+  cards = cards.filter(c => c.id !== id);
+  if(photos[id]){ delete photos[id]; await deletePhotoFor(id); }
+  await saveData();
+  renderAll();
+}
+
+function openLightbox(id){
+  const src = photos[id];
+  if(!src) return;
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+
+document.getElementById('addBtn').addEventListener('click', () => openModal());
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('saveBtn').addEventListener('click', saveCard);
+document.getElementById('statusHolding').addEventListener('change', toggleSoldFields);
+document.getElementById('statusSold').addEventListener('change', toggleSoldFields);
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'modalOverlay') closeModal();
+});
+document.getElementById('filterSport').addEventListener('change', renderGrid);
+document.getElementById('filterStatus').addEventListener('change', renderGrid);
+document.getElementById('sortBy').addEventListener('change', renderGrid);
+
+document.getElementById('photoUploadBtn').addEventListener('click', () => {
+  document.getElementById('f_photoInput').click();
+});
+document.getElementById('f_photoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    pendingPhoto = await resizeImage(file);
+    updatePhotoPreview();
+  }catch(err){
+    console.error('Photo processing failed', err);
+  }
+});
+document.getElementById('photoRemoveBtn').addEventListener('click', () => {
+  pendingPhoto = null;
+  updatePhotoPreview();
+});
+
+document.getElementById('chartCloseBtn').addEventListener('click', () => {
+  document.getElementById('chartModalOverlay').classList.add('hidden');
+});
+document.getElementById('chartModalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'chartModalOverlay') document.getElementById('chartModalOverlay').classList.add('hidden');
+});
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.add('hidden');
+});
+
+document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
+document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
+document.getElementById('bulkSaveBtn').addEventListener('click', saveBulkCards);
+document.getElementById('bulkAddRowBtn').addEventListener('click', addBulkRow);
+document.getElementById('bulkClearBtn').addEventListener('click', resetBulkGrid);
+document.getElementById('bulkModalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'bulkModalOverlay') closeBulkModal();
+});
+document.getElementById('bulkTableBody').addEventListener('paste', handleBulkPaste);
+
+function showAuthError(msg){
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function clearAuthError(){
+  document.getElementById('authError').classList.add('hidden');
+}
+
+function friendlyAuthError(e){
+  const code = e && e.code ? e.code : '';
+  if(code.includes('email-already-in-use')) return 'That email already has an account — try signing in instead.';
+  if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'Incorrect email or password.';
+  if(code.includes('weak-password')) return 'Password should be at least 6 characters.';
+  if(code.includes('invalid-email')) return 'That email address doesn\'t look right.';
+  return 'Something went wrong. Please try again.';
+}
+
+function startApp(){
+  const fb = window.__fb;
+
+  document.getElementById('authSigninBtn').addEventListener('click', async () => {
+    clearAuthError();
+    const email = document.getElementById('auth_email').value.trim();
+    const password = document.getElementById('auth_password').value;
+    try{
+      await fb.signInWithEmailAndPassword(fb.auth, email, password);
+    }catch(e){ showAuthError(friendlyAuthError(e)); }
+  });
+
+  document.getElementById('authSignupBtn').addEventListener('click', async () => {
+    clearAuthError();
+    const email = document.getElementById('auth_email').value.trim();
+    const password = document.getElementById('auth_password').value;
+    try{
+      await fb.createUserWithEmailAndPassword(fb.auth, email, password);
+    }catch(e){ showAuthError(friendlyAuthError(e)); }
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', async () => {
+    await fb.signOut(fb.auth);
+  });
+
+  fb.onAuthStateChanged(fb.auth, async (user) => {
+    if(user){
+      currentUid = user.uid;
+      document.getElementById('authScreen').classList.add('hidden');
+      document.getElementById('appWrap').classList.remove('hidden');
+      document.getElementById('auth_password').value = '';
+      clearAuthError();
+      await loadData();
+      renderAll();
+    }else{
+      currentUid = null;
+      cards = [];
+      photos = {};
+      document.getElementById('appWrap').classList.add('hidden');
+      document.getElementById('authScreen').classList.remove('hidden');
+    }
+  });
+}
+
+if(window.__fb){ startApp(); }
+else{ window.addEventListener('firebase-ready', startApp, { once: true }); }
+</script>
+</body>
+</html>
