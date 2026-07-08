@@ -1408,16 +1408,27 @@ function parseCardText(rawText){
   }else{
     const usedNumbers = new Set([result.number, result.year].filter(Boolean));
     const subgradeWordsRe = /\b(CENTERING|CORNERS|EDGES|SURFACE)\b/i;
-    const isIsolatedNumber = (l) => /^[0-9]{1,2}(\.5)?$/.test(l.trim()) && !usedNumbers.has(l.trim());
-    let isolatedNumberLine = lines.find((l, idx) => {
-      if(!isIsolatedNumber(l)) return false;
-      const prevIsSubgrade = idx > 0 && subgradeWordsRe.test(lines[idx-1]);
-      const nextIsSubgrade = idx < lines.length-1 && subgradeWordsRe.test(lines[idx+1]);
-      return !prevIsSubgrade && !nextIsSubgrade;
+    const isSubgradeAdjacent = (idx) =>
+      (idx > 0 && subgradeWordsRe.test(lines[idx-1])) || (idx < lines.length-1 && subgradeWordsRe.test(lines[idx+1]));
+
+    const gradeCandidates = [];
+    lines.forEach((l, idx) => {
+      const t = l.trim();
+      if(/^[0-9]{1,2}(\.5)?$/.test(t) && !usedNumbers.has(t)){
+        gradeCandidates.push({ num: t, subAdj: isSubgradeAdjacent(idx), tier: 0 });
+      }
     });
-    if(!isolatedNumberLine) isolatedNumberLine = lines.find(isIsolatedNumber);
-    if(isolatedNumberLine) gradeNum = isolatedNumberLine.trim();
-    else if(company){
+    lines.forEach((l, idx) => {
+      const t = l.trim();
+      const m = t.match(/(?:^|\s)([0-9]{1,2}(?:\.5)?)$/);
+      if(m && t !== m[1] && !usedNumbers.has(m[1])){
+        gradeCandidates.push({ num: m[1], subAdj: isSubgradeAdjacent(idx), tier: 1 });
+      }
+    });
+    gradeCandidates.sort((a, b) => (a.subAdj - b.subAdj) || (a.tier - b.tier));
+    if(gradeCandidates.length){
+      gradeNum = gradeCandidates[0].num;
+    }else if(company){
       const nearCompany = text.match(new RegExp(company + '\\D{0,15}?([0-9]{1,2}(?:\\.5)?)\\b', 'i'));
       if(nearCompany) gradeNum = nearCompany[1];
     }
@@ -1450,14 +1461,20 @@ function parseCardText(rawText){
   const candidates = [];
   lines.forEach((l, idx) => {
     if(idx === yearLineIndex) return;
-    // Strip a card-number token (e.g. "#249") so a shared line like "#249 JA MORANT" can still qualify
-    const candidateLine = l.replace(/#\s?[A-Za-z0-9-]{1,8}/, '').trim();
+    // OCR often merges the right-column grade/qualifier onto the same visual row as the
+    // player/card name (e.g. "CHARIZARD ex GEM MT" or "CHARIZARD ex PREMIUM COLL. 10").
+    // Strip that noise out before judging whether what's left looks like a name.
+    let candidateLine = l
+      .replace(/#\s?[A-Za-z0-9-]{1,8}/g, ' ')
+      .replace(qualRe, ' ')
+      .replace(/\b[0-9]{1,3}(?:\.5)?\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     if(/[-–—]/.test(candidateLine)) return; // a dash usually separates a set name from its parallel, not part of a person's name
     const letters = candidateLine.replace(/[^A-Za-z' ]/g, '').trim();
     const words = letters.split(/\s+/).filter(Boolean);
     if(words.length < 1 || words.length > 4) return;
     if(skipWords.test(candidateLine)) return;
-    if(/\d/.test(candidateLine)) return;
     if(letters.length < 3) return;
     candidates.push({ letters, wordCount: words.length, idx });
   });
