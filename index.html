@@ -1112,14 +1112,16 @@ function renderSlab(c){
   const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
   const valueLabel = isSold ? 'Sold for' : 'Current value';
   const cardPhotos = photos[c.id] || [];
-  const cover = cardPhotos[0];
+  let coverIndex = cardPhotos.findIndex(p => p.label === 'Front');
+  if(coverIndex === -1) coverIndex = 0;
+  const cover = cardPhotos[coverIndex];
 
   return `
     <div class="slab ${isSold ? 'sold' : ''}">
       ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
-      <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', 0)"` : ''}>
+      <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', ${coverIndex})"` : ''}>
         ${cover ? `<img src="${cover.dataUrl}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
-        ${cardPhotos.length > 1 ? `<span class="photo-count-badge">1 / ${cardPhotos.length}</span>` : ''}
+        ${cardPhotos.length > 1 ? `<span class="photo-count-badge">${coverIndex+1} / ${cardPhotos.length}</span>` : ''}
       </div>
       <div class="slab-label">
         <div class="slab-label-left">
