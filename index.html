@@ -12,7 +12,8 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    signOut, onAuthStateChanged
+    signOut, onAuthStateChanged, updateProfile, deleteUser,
+    reauthenticateWithCredential, EmailAuthProvider
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc, deleteDoc,
@@ -35,7 +36,8 @@
   // Expose what the rest of the (non-module) app script needs
   window.__fb = {
     auth, db, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+    updateProfile, deleteUser, reauthenticateWithCredential, EmailAuthProvider
   };
   window.dispatchEvent(new Event('firebase-ready'));
 </script>
@@ -86,6 +88,33 @@
     cursor:pointer;
   }
   .btn-signout:hover{background:var(--red);color:#fff;}
+  .btn-profile{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    padding:7px 16px;
+    border-radius:5px;
+    background:transparent;
+    border:1.5px solid var(--ink-soft);
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .btn-profile:hover{background:var(--ink);color:#F5F0E1;border-color:var(--ink);}
+
+  .danger-zone{
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid var(--line-strong);
+  }
+  .danger-zone-title{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--red-dark);
+    margin-bottom:8px;
+  }
 
   /* ---------- scoreboard header ---------- */
   .scoreboard{
@@ -485,7 +514,10 @@
 
   <div class="topbar">
     <div class="user-welcome" id="userWelcome"></div>
-    <button class="btn-signout" id="signOutBtn">Sign out</button>
+    <div style="display:flex;gap:10px;">
+      <button class="btn-profile" id="profileBtn">Profile</button>
+      <button class="btn-signout" id="signOutBtn">Sign out</button>
+    </div>
   </div>
 
   <div class="scoreboard">
@@ -535,6 +567,7 @@
       </select>
     </div>
     <div style="display:flex;gap:10px;">
+      <button class="btn secondary" id="exportBtn">Export CSV</button>
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
       <button class="btn" id="addBtn">+ Add card</button>
     </div>
@@ -618,6 +651,46 @@
     <div class="modal-actions">
       <button class="btn secondary" id="cancelBtn">Cancel</button>
       <button class="btn" id="saveBtn">Save card</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="profileModalOverlay">
+  <div class="modal">
+    <h2>Profile</h2>
+    <p class="sub">Update your display name or manage your account.</p>
+
+    <div class="field full" style="margin-bottom:12px;">
+      <label>Display name</label>
+      <input type="text" id="profile_displayName" placeholder="Your name">
+    </div>
+    <div class="field full" style="margin-bottom:6px;">
+      <label>Email</label>
+      <input type="text" id="profile_email" disabled>
+    </div>
+    <div id="profileMsg" class="auth-error hidden"></div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" id="profileCancelBtn">Close</button>
+      <button class="btn" id="profileSaveBtn">Save name</button>
+    </div>
+
+    <div class="danger-zone">
+      <div class="danger-zone-title">Danger zone</div>
+      <p class="sub" style="margin:0 0 12px;">Deleting your account permanently removes your entire card collection, all photos, and your login. This can't be undone.</p>
+      <button class="btn danger" id="deleteAccountBtn">Delete my account</button>
+
+      <div id="deleteConfirmSection" class="hidden" style="margin-top:14px;">
+        <div class="field full" style="margin-bottom:10px;">
+          <label>Confirm your password to continue</label>
+          <input type="password" id="delete_password" placeholder="Current password">
+        </div>
+        <div id="deleteMsg" class="auth-error hidden"></div>
+        <div class="modal-actions" style="margin-top:12px;">
+          <button class="btn secondary" id="deleteCancelBtn">Cancel</button>
+          <button class="btn danger" id="deleteConfirmBtn">Permanently delete everything</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1546,6 +1619,35 @@ function friendlyAuthError(e){
   return 'Something went wrong. Please try again.';
 }
 
+function updateWelcomeText(user){
+  const name = user.displayName && user.displayName.trim() ? user.displayName.trim() : nameFromEmail(user.email || '');
+  document.getElementById('userWelcome').innerHTML = `Welcome, <strong>${escapeHtml(name)}</strong>`;
+}
+
+function exportCsv(){
+  const headers = ['Player','Sport','Year','Set','Card #','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes'];
+  const rows = cards.map(c => [
+    c.player, c.sport, c.year, c.set, c.number, c.grade, c.status,
+    c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes
+  ]);
+  const csvEscape = (v) => {
+    if(v === undefined || v === null) v = '';
+    v = String(v);
+    if(/[",\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  };
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `revival-cards-export-${todayIso()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function startApp(){
   const fb = window.__fb;
 
@@ -1571,6 +1673,78 @@ function startApp(){
     await fb.signOut(fb.auth);
   });
 
+  document.getElementById('exportBtn').addEventListener('click', exportCsv);
+
+  // ---- Profile modal ----
+  document.getElementById('profileBtn').addEventListener('click', () => {
+    const user = fb.auth.currentUser;
+    if(!user) return;
+    document.getElementById('profile_displayName').value = user.displayName || '';
+    document.getElementById('profile_email').value = user.email || '';
+    document.getElementById('profileMsg').classList.add('hidden');
+    document.getElementById('deleteConfirmSection').classList.add('hidden');
+    document.getElementById('delete_password').value = '';
+    document.getElementById('deleteMsg').classList.add('hidden');
+    document.getElementById('profileModalOverlay').classList.remove('hidden');
+  });
+  document.getElementById('profileCancelBtn').addEventListener('click', () => {
+    document.getElementById('profileModalOverlay').classList.add('hidden');
+  });
+  document.getElementById('profileModalOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'profileModalOverlay') document.getElementById('profileModalOverlay').classList.add('hidden');
+  });
+  document.getElementById('profileSaveBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('profileMsg');
+    msg.classList.add('hidden');
+    const name = document.getElementById('profile_displayName').value.trim();
+    try{
+      await fb.updateProfile(fb.auth.currentUser, { displayName: name });
+      updateWelcomeText(fb.auth.currentUser);
+      msg.textContent = 'Saved.';
+      msg.style.color = 'var(--field-dark)';
+      msg.classList.remove('hidden');
+    }catch(e){
+      msg.textContent = 'Could not save — please try again.';
+      msg.style.color = '';
+      msg.classList.remove('hidden');
+    }
+  });
+
+  // ---- Account deletion ----
+  document.getElementById('deleteAccountBtn').addEventListener('click', () => {
+    document.getElementById('deleteConfirmSection').classList.remove('hidden');
+  });
+  document.getElementById('deleteCancelBtn').addEventListener('click', () => {
+    document.getElementById('deleteConfirmSection').classList.add('hidden');
+    document.getElementById('delete_password').value = '';
+  });
+  document.getElementById('deleteConfirmBtn').addEventListener('click', async () => {
+    const deleteMsg = document.getElementById('deleteMsg');
+    deleteMsg.classList.add('hidden');
+    const password = document.getElementById('delete_password').value;
+    const user = fb.auth.currentUser;
+    if(!user || !password){
+      deleteMsg.textContent = 'Enter your password to continue.';
+      deleteMsg.classList.remove('hidden');
+      return;
+    }
+    if(!confirm('This will permanently delete your entire card collection, all photos, and your account. This cannot be undone. Continue?')) return;
+    try{
+      const cred = fb.EmailAuthProvider.credential(user.email, password);
+      await fb.reauthenticateWithCredential(user, cred);
+
+      const arr = Object.values(photos).flat();
+      for(const p of arr){ await deletePhotoDoc(p.id); }
+      try{ await fb.deleteDoc(fb.doc(fb.db, 'users', currentUid)); }catch(e){ console.error(e); }
+
+      await fb.deleteUser(user);
+    }catch(e){
+      console.error('Account deletion failed', e);
+      deleteMsg.textContent = friendlyAuthError(e);
+      deleteMsg.classList.remove('hidden');
+    }
+  });
+
   fb.onAuthStateChanged(fb.auth, async (user) => {
     if(user){
       currentUid = user.uid;
@@ -1578,8 +1752,7 @@ function startApp(){
       document.getElementById('appWrap').classList.remove('hidden');
       document.getElementById('auth_password').value = '';
       clearAuthError();
-      const name = nameFromEmail(user.email || '');
-      document.getElementById('userWelcome').innerHTML = `Welcome, <strong>${name}</strong>`;
+      updateWelcomeText(user);
       await loadData();
       renderAll();
     }else{
@@ -1587,6 +1760,7 @@ function startApp(){
       cards = [];
       photos = {};
       document.getElementById('appWrap').classList.add('hidden');
+      document.getElementById('profileModalOverlay').classList.add('hidden');
       document.getElementById('authScreen').classList.remove('hidden');
     }
   });
