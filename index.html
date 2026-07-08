@@ -1627,7 +1627,8 @@ function saveBulkCards(){
     if(!rowData.player) return;
 
     const purchasePrice = parseFloat(rowData.purchasePrice) || 0;
-    const value = parseFloat(rowData.value) || 0;
+    const hasValueInput = rowData.value.trim() !== '';
+    const value = hasValueInput ? (parseFloat(rowData.value) || 0) : purchasePrice;
     const normalizedSoldDate = normalizeDate(rowData.soldDate);
     const isSold = !!normalizedSoldDate;
     const purchaseDate = normalizeDate(rowData.purchaseDate) || todayIso();
@@ -1653,7 +1654,9 @@ function saveBulkCards(){
     };
     if(isSold){
       pushHistoryPoint(card, normalizedSoldDate, value);
-    }else if(value && value !== purchasePrice){
+    }else{
+      // Always record today as the "last updated" point so a card with an older
+      // purchase date doesn't immediately show as needing a price check.
       pushHistoryPoint(card, todayIso(), value);
     }
     newCards.push(card);
@@ -1996,7 +1999,7 @@ function isStale(c){
   const hist = Array.isArray(c.history) && c.history.length ? c.history : null;
   const lastDate = hist ? hist[hist.length-1].date : c.purchaseDate;
   const days = daysSince(lastDate);
-  return days !== null && days >= 90;
+  return days !== null && days >= 30;
 }
 
 function getFilteredSorted(){
@@ -2530,12 +2533,21 @@ async function saveCard(){
     }
   }else{
     targetId = uid();
-    cards.push({
+    const newCard = {
       id: targetId,
       createdAt: Date.now(),
       history: [{ date: data.purchaseDate || todayIso(), value: data.purchasePrice }],
       ...data
-    });
+    };
+    if(newCard.status === 'sold'){
+      pushHistoryPoint(newCard, newCard.soldDate || todayIso(), newCard.soldPrice);
+    }else{
+      // Always record today as the "last updated" point, even if current value equals
+      // purchase price — otherwise a card with an older purchase date would show as
+      // needing a price check the moment it's added.
+      pushHistoryPoint(newCard, todayIso(), newCard.currentValue);
+    }
+    cards.push(newCard);
   }
 
   for(const pid of removedPhotoIds){
@@ -2835,7 +2847,8 @@ function importCsvFile(file){
       if(!player) continue;
 
       const purchasePrice = parseFloat(get(r, 'purchasePrice')) || 0;
-      const currentValue = parseFloat(get(r, 'currentValue')) || 0;
+      const currentValueRaw = get(r, 'currentValue');
+      const currentValue = currentValueRaw !== '' ? (parseFloat(currentValueRaw) || 0) : purchasePrice;
       const soldPrice = parseFloat(get(r, 'soldPrice')) || 0;
       const purchaseDate = normalizeDate(get(r, 'purchaseDate')) || todayIso();
       const soldDateRaw = get(r, 'soldDate');
@@ -2867,7 +2880,9 @@ function importCsvFile(file){
       };
       if(isSold){
         pushHistoryPoint(card, card.soldDate, soldPrice);
-      }else if(currentValue && currentValue !== purchasePrice){
+      }else{
+        // Always record today as the "last updated" point so a card with an older
+        // purchase date doesn't immediately show as needing a price check.
         pushHistoryPoint(card, todayIso(), currentValue);
       }
       newCards.push(card);
