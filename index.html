@@ -648,6 +648,29 @@
     margin-top:4px;
   }
 
+  .beta-badge{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.6px;
+    color:var(--gold-dark);
+    background:rgba(184,137,43,0.15);
+    border:1px solid rgba(184,137,43,0.4);
+    padding:2px 7px;
+    border-radius:10px;
+    vertical-align:middle;
+    margin-left:8px;
+  }
+  .beta-warning{
+    background:rgba(184,137,43,0.1);
+    border:1px solid rgba(184,137,43,0.35);
+    color:var(--gold-dark);
+    padding:8px 10px;
+    border-radius:4px;
+    margin-bottom:10px !important;
+  }
+
   @media (max-width:600px){
     .scoreboard{flex-direction:column;align-items:flex-start;}
     .scoreboard-stats{width:100%;justify-content:space-between;gap:12px;}
@@ -771,7 +794,7 @@
       <button class="btn secondary" id="importBtn">Import CSV</button>
       <input type="file" id="importFileInput" accept=".csv" style="display:none;">
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
-      <button class="btn secondary" id="scanCardBtn">📷 Scan card</button>
+      <button class="btn secondary" id="scanCardBtn">📷 Scan card <span class="beta-badge" style="margin-left:6px;">BETA</span></button>
       <button class="btn" id="addBtn">+ Add card</button>
     </div>
   </div>
@@ -983,7 +1006,8 @@
 
 <div class="modal-overlay hidden" id="scanModalOverlay">
   <div class="modal">
-    <h2>Scan a card</h2>
+    <h2>Scan a card <span class="beta-badge">BETA</span></h2>
+    <p class="sub beta-warning">This feature is still rough around the edges — it will sometimes get the name, set, or grade wrong (or leave them blank). Always double-check every field below before saving.</p>
     <p class="sub">Take a photo or upload an image. Works best on a clear, well-lit graded slab label — raw card fronts are hit or miss.</p>
 
     <input type="file" id="scan_fileInput" accept="image/*" style="display:none;">
