@@ -1104,6 +1104,7 @@ function getBulkCellInput(rowIndex, colIndex){
 
 // ---------- Card scanner (on-device OCR) ----------
 let scanImageDataUrl = null;
+let scanImageFile = null;
 let tesseractLoadPromise = null;
 
 function loadTesseract(){
@@ -1121,6 +1122,7 @@ function loadTesseract(){
 
 function openScanModal(){
   scanImageDataUrl = null;
+  scanImageFile = null;
   document.getElementById('scanPreviewImg').classList.add('hidden');
   document.getElementById('scanPreviewImg').src = '';
   document.getElementById('scanStatus').classList.add('hidden');
@@ -1142,6 +1144,60 @@ function setScanStatus(msg){
   el.classList.remove('hidden');
 }
 
+function resizeForOcr(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1800;
+        let w = img.width, h = img.height;
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        // Grayscale + contrast boost — meaningfully improves OCR on photographed (not scanned) text
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+        for(let i = 0; i < d.length; i += 4){
+          const gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+          let v = (gray - 128) * 1.5 + 128;
+          v = Math.max(0, Math.min(255, v));
+          d[i] = d[i+1] = d[i+2] = v;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function runOcrOnImage(dataUrl, onProgress){
+  const { createWorker } = window.Tesseract;
+  const worker = await createWorker('eng', 1, {
+    logger: (m) => { if(onProgress && m.status === 'recognizing text') onProgress(m.progress); }
+  });
+  const psmModes = ['6', '11', '3', '4'];
+  let bestText = '';
+  for(const psm of psmModes){
+    await worker.setParameters({ tessedit_pageseg_mode: psm });
+    const { data } = await worker.recognize(dataUrl);
+    const t = (data.text || '').trim();
+    if(t.length > bestText.length) bestText = t;
+    if(bestText.length > 50) break;
+  }
+  await worker.terminate();
+  return bestText;
+}
+
 async function runCardScan(){
   if(!scanImageDataUrl) return;
   const btn = document.getElementById('scanBtn');
@@ -1150,15 +1206,16 @@ async function runCardScan(){
   try{
     await loadTesseract();
     setScanStatus('Reading card — this can take a few seconds...');
-    const { data } = await window.Tesseract.recognize(scanImageDataUrl, 'eng');
-    const text = data.text || '';
+    const text = await runOcrOnImage(scanImageDataUrl, (pct) => {
+      setScanStatus(`Reading card — ${Math.round(pct*100)}%...`);
+    });
     const guesses = parseCardText(text);
     document.getElementById('scan_player').value = guesses.player;
     document.getElementById('scan_year').value = guesses.year;
     document.getElementById('scan_set').value = guesses.set;
     document.getElementById('scan_number').value = guesses.number;
     document.getElementById('scan_grade').value = guesses.grade;
-    document.getElementById('scanRawText').textContent = text.trim() || '(no text detected)';
+    document.getElementById('scanRawText').textContent = text.trim() || '(no text detected — try a closer, brighter, glare-free photo of just the label)';
     document.getElementById('scanResultsBox').classList.remove('hidden');
     document.getElementById('scanUseBtn').classList.remove('hidden');
     setScanStatus('');
@@ -1238,7 +1295,7 @@ function parseCardText(rawText){
   return result;
 }
 
-function useScanResults(){
+async function useScanResults(){
   const guesses = {
     player: document.getElementById('scan_player').value.trim(),
     year: document.getElementById('scan_year').value.trim(),
@@ -1246,7 +1303,7 @@ function useScanResults(){
     number: document.getElementById('scan_number').value.trim(),
     grade: document.getElementById('scan_grade').value.trim(),
   };
-  const photoToAttach = scanImageDataUrl;
+  const fileForPhoto = scanImageFile;
   closeScanModal();
   openModal();
   document.getElementById('f_player').value = guesses.player;
@@ -1255,9 +1312,14 @@ function useScanResults(){
   document.getElementById('f_number').value = guesses.number;
   document.getElementById('f_grade').value = guesses.grade;
   updateCheckPriceLink();
-  if(photoToAttach){
-    modalPhotos.push({ id: null, label: 'Front', dataUrl: photoToAttach, isNew: true });
-    renderModalPhotos();
+  if(fileForPhoto){
+    try{
+      const storagePhoto = await resizeImage(fileForPhoto);
+      modalPhotos.push({ id: null, label: 'Front', dataUrl: storagePhoto, isNew: true });
+      renderModalPhotos();
+    }catch(e){
+      console.error('Could not attach scanned photo', e);
+    }
   }
 }
 
@@ -2376,7 +2438,8 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
   const file = e.target.files[0];
   if(!file) return;
   try{
-    scanImageDataUrl = await resizeImage(file);
+    scanImageFile = file;
+    scanImageDataUrl = await resizeForOcr(file);
     const img = document.getElementById('scanPreviewImg');
     img.src = scanImageDataUrl;
     img.classList.remove('hidden');
