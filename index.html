@@ -610,6 +610,10 @@
         <label>Card #</label>
         <input type="text" id="f_number" placeholder="#1">
       </div>
+      <div class="field">
+        <label>Variant</label>
+        <input type="text" id="f_variant" placeholder="Refractor, Auto, /99...">
+      </div>
       <div class="field full">
         <label>Grading</label>
         <input type="text" id="f_grade" placeholder="PSA 10, BGS 9.5, or Raw">
@@ -708,6 +712,7 @@
             <th style="min-width:70px;">Year</th>
             <th style="min-width:130px;">Set</th>
             <th style="min-width:70px;">Card #</th>
+            <th style="min-width:110px;">Variant</th>
             <th style="min-width:100px;">Grade</th>
             <th style="min-width:90px;">Paid ($)</th>
             <th style="min-width:110px;">Purchase date</th>
@@ -759,7 +764,7 @@ let modalPhotos = [];
 let removedPhotoIds = [];
 let portfolioChartInstance = null;
 let cardChartInstance = null;
-const BULK_COLS = ['player','sport','year','set','number','grade','purchasePrice','purchaseDate','value','soldDate','notes'];
+const BULK_COLS = ['player','sport','year','set','number','variant','grade','purchasePrice','purchaseDate','value','soldDate','notes'];
 const BULK_MIN_ROWS = 8;
 
 function bulkRowCount(){
@@ -874,6 +879,7 @@ function saveBulkCards(){
       year: rowData.year,
       set: rowData.set,
       number: rowData.number,
+      variant: rowData.variant,
       grade: rowData.grade,
       purchasePrice,
       purchaseDate,
@@ -1286,7 +1292,7 @@ function renderSlab(c){
       </div>
       <div class="slab-body">
         <div class="slab-title">${escapeHtml(c.player || 'Untitled card')}</div>
-        <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}</div>
+        <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}${c.variant ? ' &middot; ' + escapeHtml(c.variant) : ''}</div>
         <div class="slab-nums">
           <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
@@ -1382,6 +1388,7 @@ function openModal(id){
     document.getElementById('f_year').value = c.year || '';
     document.getElementById('f_set').value = c.set || '';
     document.getElementById('f_number').value = c.number || '';
+    document.getElementById('f_variant').value = c.variant || '';
     document.getElementById('f_grade').value = c.grade || '';
     document.getElementById('f_purchasePrice').value = c.purchasePrice ?? '';
     document.getElementById('f_purchaseDate').value = c.purchaseDate || '';
@@ -1395,7 +1402,7 @@ function openModal(id){
   }else{
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
-    ['f_player','f_sport','f_year','f_set','f_number','f_grade','f_purchasePrice',
+    ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_purchasePrice',
      'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -1437,6 +1444,7 @@ async function saveCard(){
     year: document.getElementById('f_year').value.trim(),
     set: document.getElementById('f_set').value.trim(),
     number: document.getElementById('f_number').value.trim(),
+    variant: document.getElementById('f_variant').value.trim(),
     grade: document.getElementById('f_grade').value.trim(),
     purchasePrice: parseFloat(document.getElementById('f_purchasePrice').value) || 0,
     purchaseDate: document.getElementById('f_purchaseDate').value,
@@ -1625,9 +1633,9 @@ function updateWelcomeText(user){
 }
 
 function exportCsv(){
-  const headers = ['Player','Sport','Year','Set','Card #','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes'];
+  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes'];
   const rows = cards.map(c => [
-    c.player, c.sport, c.year, c.set, c.number, c.grade, c.status,
+    c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.status,
     c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes
   ]);
   const csvEscape = (v) => {
