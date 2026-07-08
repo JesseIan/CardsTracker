@@ -143,17 +143,63 @@
   .sb-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:4px;color:#B9C4AE;}
 
   /* ---------- portfolio chart panel ---------- */
+  .charts-row{
+    display:grid;
+    grid-template-columns:1.4fr 1fr;
+    gap:16px;
+    margin-top:20px;
+  }
   .chart-panel{
     background:var(--paper);
     border:1px solid var(--line-strong);
     border-radius:8px;
     padding:16px 18px 8px;
-    margin-top:20px;
   }
   .chart-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .chart-panel-head h3{font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;margin:0;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);}
-  #portfolioRangeFilter{font-size:12px;padding:5px 8px;}
+  #portfolioRangeFilter, #breakdownFilter{font-size:12px;padding:5px 8px;}
   .chart-wrap{position:relative;height:220px;}
+
+  @media (max-width:800px){
+    .charts-row{grid-template-columns:1fr;}
+  }
+
+  .movers-panel{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:16px;
+  }
+  .mover-col{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:14px 16px;
+  }
+  .mover-col h3{
+    font-family:'Oswald',sans-serif;font-weight:500;font-size:13px;margin:0 0 10px;
+    text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);
+  }
+  .mover-row{
+    display:grid;
+    grid-template-columns:1fr auto auto;
+    gap:10px;
+    align-items:center;
+    padding:6px 0;
+    border-top:1px solid var(--line);
+    font-size:13px;
+  }
+  .mover-row:first-child{border-top:none;}
+  .mover-name{font-family:'Inter',sans-serif;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mover-roi{font-family:'IBM Plex Mono',monospace;font-weight:600;min-width:58px;text-align:right;}
+  .mover-roi.pos{color:var(--gold-dark);}
+  .mover-roi.neg{color:var(--red-dark);}
+  .mover-gain{font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);min-width:70px;text-align:right;}
+  .mover-empty{font-size:12px;color:var(--ink-soft);font-style:italic;padding:6px 0;}
+
+  @media (max-width:800px){
+    .movers-panel{grid-template-columns:1fr;}
+  }
 
   /* ---------- controls ---------- */
   .controls{
@@ -275,6 +321,18 @@
   .num-label{color:var(--ink-soft);font-size:10px;text-transform:uppercase;letter-spacing:0.6px;}
   .num-value{font-size:13px;color:var(--ink);margin-top:1px;}
   .slab-notes{font-size:12px;color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--line);padding-top:8px;margin-top:2px;}
+  .stale-badge{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.4px;
+    color:var(--red-dark);
+    background:rgba(166,61,64,0.1);
+    border:1px solid rgba(166,61,64,0.3);
+    padding:3px 8px;
+    border-radius:10px;
+    width:fit-content;
+  }
   .slab-actions{
     display:flex;
     gap:8px;
@@ -543,12 +601,36 @@
     </div>
   </div>
 
-  <div class="chart-panel">
-    <div class="chart-panel-head">
-      <h3>Portfolio value over time</h3>
-      <select id="portfolioRangeFilter"><option value="all">All time</option></select>
+  <div class="charts-row">
+    <div class="chart-panel">
+      <div class="chart-panel-head">
+        <h3>Portfolio value over time</h3>
+        <select id="portfolioRangeFilter"><option value="all">All time</option></select>
+      </div>
+      <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
     </div>
-    <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
+
+    <div class="chart-panel">
+      <div class="chart-panel-head">
+        <h3>Breakdown by sport</h3>
+        <select id="breakdownFilter">
+          <option value="value">By value</option>
+          <option value="count">By card count</option>
+        </select>
+      </div>
+      <div class="chart-wrap"><canvas id="breakdownChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="movers-panel hidden" id="topMoversPanel">
+    <div class="mover-col">
+      <h3>Top gainers</h3>
+      <div id="topGainersList"></div>
+    </div>
+    <div class="mover-col">
+      <h3>Top losers</h3>
+      <div id="topLosersList"></div>
+    </div>
   </div>
 
   <div class="controls">
@@ -558,6 +640,7 @@
         <option value="all">All cards</option>
         <option value="holding">Holding</option>
         <option value="sold">Sold</option>
+        <option value="stale">Needs price check</option>
       </select>
       <select id="sortBy">
         <option value="roi_desc">Sort: ROI (high to low)</option>
@@ -569,6 +652,8 @@
     </div>
     <div style="display:flex;gap:10px;">
       <button class="btn secondary" id="exportBtn">Export CSV</button>
+      <button class="btn secondary" id="importBtn">Import CSV</button>
+      <input type="file" id="importFileInput" accept=".csv" style="display:none;">
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
       <button class="btn" id="addBtn">+ Add card</button>
     </div>
@@ -764,6 +849,7 @@ let editingId = null;
 let modalPhotos = [];
 let removedPhotoIds = [];
 let portfolioChartInstance = null;
+let breakdownChartInstance = null;
 let cardChartInstance = null;
 const BULK_COLS = ['player','sport','year','set','number','variant','grade','purchasePrice','purchaseDate','value','soldDate','notes'];
 const BULK_MIN_ROWS = 8;
@@ -1216,6 +1302,21 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+function daysSince(dateStr){
+  const iso = normalizeDate(dateStr) || dateStr;
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
+}
+
+function isStale(c){
+  if(c.status === 'sold') return false;
+  const hist = Array.isArray(c.history) && c.history.length ? c.history : null;
+  const lastDate = hist ? hist[hist.length-1].date : c.purchaseDate;
+  const days = daysSince(lastDate);
+  return days !== null && days >= 90;
+}
+
 function getFilteredSorted(){
   const sport = document.getElementById('filterSport').value;
   const status = document.getElementById('filterStatus').value;
@@ -1223,6 +1324,7 @@ function getFilteredSorted(){
 
   let list = cards.filter(c => {
     if(sport !== 'all' && (c.sport||'') !== sport) return false;
+    if(status === 'stale') return isStale(c);
     if(status !== 'all' && c.status !== status) return false;
     return true;
   });
@@ -1294,6 +1396,7 @@ function renderSlab(c){
       <div class="slab-body">
         <div class="slab-title">${escapeHtml(c.player || 'Untitled card')}</div>
         <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}${c.variant ? ' &middot; ' + escapeHtml(c.variant) : ''}</div>
+        ${isStale(c) ? '<div class="stale-badge">⏱ Needs price check</div>' : ''}
         <div class="slab-nums">
           <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
@@ -1315,6 +1418,85 @@ function renderAll(){
   populateSportFilter();
   renderGrid();
   renderPortfolioChart();
+  renderBreakdownChart();
+  renderTopMovers();
+}
+
+function renderBreakdownChart(){
+  const ctx = document.getElementById('breakdownChart');
+  const mode = document.getElementById('breakdownFilter').value;
+  const holding = cards.filter(c => c.status !== 'sold');
+
+  if(holding.length === 0){
+    if(breakdownChartInstance){ breakdownChartInstance.destroy(); breakdownChartInstance = null; }
+    return;
+  }
+
+  const bySport = {};
+  holding.forEach(c => {
+    const key = c.sport && c.sport.trim() ? c.sport.trim() : 'Other';
+    const amount = mode === 'count' ? 1 : (Number(c.currentValue) || 0);
+    bySport[key] = (bySport[key] || 0) + amount;
+  });
+
+  const labels = Object.keys(bySport).sort((a,b) => bySport[b] - bySport[a]);
+  const data = labels.map(l => bySport[l]);
+  const palette = ['#B8892B', '#2B4735', '#A63D40', '#3C4566', '#8A8F7A', '#C9A227', '#7A2C2E', '#1E3326'];
+
+  if(breakdownChartInstance) breakdownChartInstance.destroy();
+  breakdownChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+        borderColor: '#FBF7EC',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (item) => mode === 'count'
+              ? ` ${item.label}: ${item.raw} card${item.raw === 1 ? '' : 's'}`
+              : ` ${item.label}: ${fmtMoney(item.raw)}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderTopMovers(){
+  const panel = document.getElementById('topMoversPanel');
+  if(cards.length === 0){
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+
+  const withRoi = cards.map(c => ({ c, roi: cardRoi(c), gain: cardGainDollar(c) }));
+  const gainers = [...withRoi].filter(x => x.roi > 0).sort((a,b) => b.roi - a.roi).slice(0,3);
+  const losers = [...withRoi].filter(x => x.roi < 0).sort((a,b) => a.roi - b.roi).slice(0,3);
+
+  const renderList = (items, emptyMsg) => {
+    if(items.length === 0) return `<div class="mover-empty">${emptyMsg}</div>`;
+    return items.map(({c, roi, gain}) => `
+      <div class="mover-row">
+        <span class="mover-name">${escapeHtml(c.player || 'Untitled')}</span>
+        <span class="mover-roi ${roi >= 0 ? 'pos' : 'neg'}">${fmtPct(roi)}</span>
+        <span class="mover-gain">${(gain>=0?'+':'') + fmtMoney(gain)}</span>
+      </div>
+    `).join('');
+  };
+
+  document.getElementById('topGainersList').innerHTML = renderList(gainers, 'No gainers yet');
+  document.getElementById('topLosersList').innerHTML = renderList(losers, 'No losers — nice');
 }
 
 function renderModalPhotos(){
@@ -1551,6 +1733,7 @@ document.getElementById('modalOverlay').addEventListener('click', (e) => {
 });
 document.getElementById('filterSport').addEventListener('change', renderGrid);
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
+document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
 document.getElementById('sortBy').addEventListener('change', renderGrid);
 
@@ -1657,6 +1840,122 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
+function parseCsvText(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      }else{
+        field += ch;
+      }
+    }else{
+      if(ch === '"') inQuotes = true;
+      else if(ch === ','){ row.push(field); field = ''; }
+      else if(ch === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else if(ch === '\r'){ /* skip, \n handles the line break */ }
+      else field += ch;
+    }
+  }
+  if(field.length > 0 || row.length > 0){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+function importCsvFile(file){
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const rows = parseCsvText(e.target.result);
+    if(rows.length < 2){
+      alert('That file didn\'t have any card rows to import.');
+      return;
+    }
+    const header = rows[0].map(h => h.trim().toLowerCase());
+    const colIndex = (names) => {
+      for(const n of names){ const i = header.indexOf(n); if(i > -1) return i; }
+      return -1;
+    };
+    const idx = {
+      player: colIndex(['player']),
+      sport: colIndex(['sport']),
+      year: colIndex(['year']),
+      set: colIndex(['set']),
+      number: colIndex(['card #','card#','number']),
+      variant: colIndex(['variant']),
+      grade: colIndex(['grade']),
+      status: colIndex(['status']),
+      purchasePrice: colIndex(['purchase price','paid ($)','paid']),
+      purchaseDate: colIndex(['purchase date']),
+      currentValue: colIndex(['current value','value ($)','value']),
+      soldPrice: colIndex(['sold price']),
+      soldDate: colIndex(['sold date']),
+      notes: colIndex(['notes']),
+    };
+    if(idx.player === -1){
+      alert('Could not find a "Player" column in that CSV — make sure it matches the exported format.');
+      return;
+    }
+
+    const get = (r, key) => idx[key] > -1 && r[idx[key]] !== undefined ? r[idx[key]].trim() : '';
+    const newCards = [];
+    for(let i = 1; i < rows.length; i++){
+      const r = rows[i];
+      const player = get(r, 'player');
+      if(!player) continue;
+
+      const purchasePrice = parseFloat(get(r, 'purchasePrice')) || 0;
+      const currentValue = parseFloat(get(r, 'currentValue')) || 0;
+      const soldPrice = parseFloat(get(r, 'soldPrice')) || 0;
+      const purchaseDate = normalizeDate(get(r, 'purchaseDate')) || todayIso();
+      const soldDateRaw = get(r, 'soldDate');
+      const soldDate = normalizeDate(soldDateRaw);
+      const statusRaw = get(r, 'status').toLowerCase();
+      const isSold = statusRaw === 'sold' || (!statusRaw && !!soldDate);
+
+      const card = {
+        id: uid(),
+        createdAt: Date.now(),
+        player,
+        sport: get(r, 'sport'),
+        year: get(r, 'year'),
+        set: get(r, 'set'),
+        number: get(r, 'number'),
+        variant: get(r, 'variant'),
+        grade: get(r, 'grade'),
+        purchasePrice,
+        purchaseDate,
+        status: isSold ? 'sold' : 'holding',
+        currentValue: isSold ? 0 : currentValue,
+        soldPrice: isSold ? soldPrice : 0,
+        soldDate: isSold ? (soldDate || todayIso()) : '',
+        notes: get(r, 'notes'),
+        history: [{ date: purchaseDate, value: purchasePrice }]
+      };
+      if(isSold){
+        pushHistoryPoint(card, card.soldDate, soldPrice);
+      }else if(currentValue && currentValue !== purchasePrice){
+        pushHistoryPoint(card, todayIso(), currentValue);
+      }
+      newCards.push(card);
+    }
+
+    if(newCards.length === 0){
+      alert('No valid rows found to import.');
+      return;
+    }
+
+    cards = cards.concat(newCards);
+    await saveData();
+    renderAll();
+    alert(`Imported ${newCards.length} card${newCards.length === 1 ? '' : 's'}.`);
+  };
+  reader.readAsText(file);
+}
+
 function startApp(){
   const fb = window.__fb;
 
@@ -1683,6 +1982,14 @@ function startApp(){
   });
 
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
+  });
+  document.getElementById('importFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) importCsvFile(file);
+    e.target.value = '';
+  });
 
   // ---- Profile modal ----
   document.getElementById('profileBtn').addEventListener('click', () => {
