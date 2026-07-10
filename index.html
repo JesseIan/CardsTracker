@@ -1032,6 +1032,10 @@
         <label>Grading</label>
         <input type="text" id="f_grade" placeholder="PSA 10, BGS 9.5, or Raw">
       </div>
+      <div class="field full">
+        <label>Cert number (optional)</label>
+        <input type="text" id="f_certNumber" placeholder="e.g. 85689485">
+      </div>
 
       <div class="field full">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -2237,7 +2241,7 @@ function getFilteredSorted(){
     if(status === 'grading' && c.gradingStatus !== 'submitted') return false;
     if(status !== 'all' && status !== 'stale' && status !== 'grading' && c.status !== status) return false;
     if(search){
-      const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.notes, ...(Array.isArray(c.tags)?c.tags:[])].join(' ').toLowerCase();
+      const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.certNumber, c.notes, ...(Array.isArray(c.tags)?c.tags:[])].join(' ').toLowerCase();
       if(!hay.includes(search)) return false;
     }
     return true;
@@ -2351,6 +2355,7 @@ function renderSlab(c){
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
           <div><span class="num-label">Gain / loss</span><span class="num-value">${(gain>=0?'+':'') + fmtMoney(gain)}</span></div>
           <div><span class="num-label">${isSold ? 'Sold' : 'Purchased'}</span><span class="num-value">${escapeHtml((isSold ? c.soldDate : c.purchaseDate) || '—')}</span></div>
+          ${c.certNumber ? `<div><span class="num-label">Cert #</span><span class="num-value">${escapeHtml(c.certNumber)}</span></div>` : ''}
         </div>
         ${c.notes ? `<div class="slab-notes">${escapeHtml(c.notes)}</div>` : ''}
       </div>
@@ -2858,6 +2863,7 @@ function openModal(id){
     document.getElementById('f_number').value = c.number || '';
     document.getElementById('f_variant').value = c.variant || '';
     document.getElementById('f_grade').value = c.grade || '';
+    document.getElementById('f_certNumber').value = c.certNumber || '';
     document.getElementById('f_purchasePrice').value = c.purchasePrice ?? '';
     document.getElementById('f_purchaseDate').value = c.purchaseDate || '';
     document.getElementById('f_currentValue').value = c.currentValue ?? '';
@@ -2874,7 +2880,7 @@ function openModal(id){
   }else{
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
-    ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_purchasePrice',
+    ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_certNumber','f_purchasePrice',
      'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes','f_tags',
      'f_gradingCompany','f_gradingSubmittedDate'].forEach(id => {
       document.getElementById(id).value = '';
@@ -2950,6 +2956,7 @@ async function saveCard(){
     number: document.getElementById('f_number').value.trim(),
     variant: document.getElementById('f_variant').value.trim(),
     grade: document.getElementById('f_grade').value.trim(),
+    certNumber: document.getElementById('f_certNumber').value.trim(),
     purchasePrice: parseFloat(document.getElementById('f_purchasePrice').value) || 0,
     purchaseDate: document.getElementById('f_purchaseDate').value,
     status,
@@ -3297,9 +3304,9 @@ function updateWelcomeText(user){
 }
 
 function exportCsv(){
-  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date'];
+  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Cert Number','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date'];
   const rows = cards.map(c => [
-    c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.status,
+    c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.certNumber, c.status,
     c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes,
     c.gradingStatus, c.gradingCompany, c.gradingSubmittedDate
   ]);
@@ -3467,6 +3474,7 @@ function importCsvFile(file){
       number: colIndex(['card #','card#','number']),
       variant: colIndex(['variant']),
       grade: colIndex(['grade']),
+      certNumber: colIndex(['cert number', 'cert#', 'cert']),
       status: colIndex(['status']),
       purchasePrice: colIndex(['purchase price','paid ($)','paid']),
       purchaseDate: colIndex(['purchase date']),
@@ -3510,6 +3518,7 @@ function importCsvFile(file){
         number: get(r, 'number'),
         variant: get(r, 'variant'),
         grade: get(r, 'grade'),
+        certNumber: get(r, 'certNumber'),
         purchasePrice,
         purchaseDate,
         status: isSold ? 'sold' : 'holding',
