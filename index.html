@@ -358,6 +358,50 @@
     grid-template-columns:repeat(auto-fill, minmax(230px,1fr));
     gap:18px;
   }
+  .group-section{margin-bottom:24px;}
+  .group-section .grid{margin-top:0;}
+  .group-heading{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ink);
+    margin-bottom:12px;
+    padding-bottom:8px;
+    border-bottom:2px solid var(--line-strong);
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  .group-count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    font-weight:400;
+  }
+
+  .selection-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:var(--ink);
+    color:#F0EBDC;
+    padding:10px 16px;
+    border-radius:6px;
+    margin-bottom:16px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+  }
+  .slab.selectable{cursor:pointer;}
+  .slab-select-box{
+    position:absolute;
+    top:8px;
+    left:8px;
+    z-index:3;
+    width:22px;
+    height:22px;
+    accent-color:var(--gold);
+    cursor:pointer;
+  }
   .slab{
     background:var(--paper);
     border:1px solid var(--line-strong);
@@ -419,6 +463,16 @@
   .num-label{color:var(--ink-soft);font-size:10px;text-transform:uppercase;letter-spacing:0.6px;}
   .num-value{font-size:13px;color:var(--ink);margin-top:1px;}
   .slab-notes{font-size:12px;color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--line);padding-top:8px;margin-top:2px;}
+  .tag-pills{display:flex;flex-wrap:wrap;gap:5px;}
+  .tag-pill{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--ink-soft);
+    background:rgba(28,37,65,0.06);
+    border:1px solid var(--line-strong);
+    padding:2px 8px;
+    border-radius:10px;
+  }
   .stale-badge{
     display:inline-block;
     font-family:'IBM Plex Mono',monospace;
@@ -445,6 +499,7 @@
   }
   .slab-actions{
     display:flex;
+    flex-wrap:wrap;
     gap:8px;
     padding:10px 14px;
     border-top:1px solid var(--line);
@@ -768,9 +823,14 @@
         <div class="sb-value" id="statValue">$0</div>
       </div>
       <div class="sb-stat">
-        <div class="sb-label">Gain / loss</div>
-        <div class="sb-value" id="statGain">$0</div>
-        <div class="sb-sub" id="statGainPct">0.0%</div>
+        <div class="sb-label">Unrealized</div>
+        <div class="sb-value" id="statUnrealized">$0</div>
+        <div class="sb-sub" id="statUnrealizedPct">0.0%</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-label">Realized</div>
+        <div class="sb-value" id="statRealized">$0</div>
+        <div class="sb-sub" id="statRealizedPct">0.0%</div>
       </div>
     </div>
   </div>
@@ -820,6 +880,7 @@
     <div class="filters">
       <input type="text" id="searchInput" placeholder="Search player, set, variant..." style="min-width:200px;">
       <select id="filterSport"><option value="all">All sports</option></select>
+      <select id="filterTag"><option value="all">All tags</option></select>
       <select id="filterStatus">
         <option value="all">All cards</option>
         <option value="holding">Holding</option>
@@ -834,8 +895,16 @@
         <option value="date_desc">Sort: recently added</option>
         <option value="date_asc">Sort: oldest added</option>
       </select>
+      <select id="groupBy">
+        <option value="none">No grouping</option>
+        <option value="set">Group by set</option>
+        <option value="year">Group by year</option>
+        <option value="sport">Group by sport</option>
+      </select>
     </div>
     <div style="display:flex;gap:10px;">
+      <button class="btn secondary" id="printViewBtn">🖨 Print view</button>
+      <button class="btn secondary" id="selectModeBtn">Select</button>
       <button class="btn secondary" id="exportBtn">Export CSV</button>
       <button class="btn secondary" id="backupBtn">Full backup</button>
       <button class="btn secondary" id="restoreBtn">Restore backup</button>
@@ -845,6 +914,15 @@
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
       <button class="btn secondary" id="scanCardBtn">📷 Scan card <span class="beta-badge" style="margin-left:6px;">BETA</span></button>
       <button class="btn" id="addBtn">+ Add card</button>
+    </div>
+  </div>
+
+  <div class="selection-bar hidden" id="selectionBar">
+    <span id="selectionCount">0 selected</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn secondary" id="bulkMarkSoldBtn">Mark as sold</button>
+      <button class="btn danger" id="bulkDeleteBtn">Delete</button>
+      <button class="btn secondary" id="bulkCancelBtn">Cancel</button>
     </div>
   </div>
 
@@ -1002,6 +1080,11 @@
       </div>
 
       <div class="field full">
+        <label>Tags (comma separated, optional)</label>
+        <input type="text" id="f_tags" placeholder="PC, for trade, gift...">
+      </div>
+
+      <div class="field full">
         <label>Notes (optional)</label>
         <textarea id="f_notes" placeholder="Where you bought it, condition notes, etc."></textarea>
       </div>
@@ -1009,6 +1092,27 @@
     <div class="modal-actions">
       <button class="btn secondary" id="cancelBtn">Cancel</button>
       <button class="btn" id="saveBtn">Save card</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="bulkSoldModalOverlay">
+  <div class="modal">
+    <h2>Mark selected cards as sold</h2>
+    <p class="sub" id="bulkSoldSub">This sold price and date will be applied to all selected cards.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>Sold price ($)</label>
+        <input type="number" id="bulkSoldPrice" step="0.01" placeholder="240.00">
+      </div>
+      <div class="field">
+        <label>Sold date</label>
+        <input type="date" id="bulkSoldDate">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="bulkSoldCancelBtn">Cancel</button>
+      <button class="btn" id="bulkSoldConfirmBtn">Apply to selected</button>
     </div>
   </div>
 </div>
@@ -1910,15 +2014,30 @@ function getCardTimeline(c){
 function renderSummary(){
   const invested = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
   const value = cards.reduce((s,c)=> s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
-  const gain = value - invested;
-  const gainPct = invested === 0 ? 0 : (gain / invested) * 100;
+
+  const holding = cards.filter(c => c.status !== 'sold');
+  const sold = cards.filter(c => c.status === 'sold');
+  const holdingInvested = holding.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const holdingValue = holding.reduce((s,c)=> s + (Number(c.currentValue)||0), 0);
+  const soldInvested = sold.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const soldValue = sold.reduce((s,c)=> s + (Number(c.soldPrice)||0), 0);
+  const unrealized = holdingValue - holdingInvested;
+  const unrealizedPct = holdingInvested === 0 ? 0 : (unrealized / holdingInvested) * 100;
+  const realized = soldValue - soldInvested;
+  const realizedPct = soldInvested === 0 ? 0 : (realized / soldInvested) * 100;
 
   document.getElementById('statInvested').textContent = fmtMoney(invested);
   document.getElementById('statValue').textContent = fmtMoney(value);
-  const gainEl = document.getElementById('statGain');
-  gainEl.textContent = (gain >= 0 ? '+' : '') + fmtMoney(gain);
-  gainEl.className = 'sb-value ' + (gain > 0 ? 'pos' : gain < 0 ? 'neg' : '');
-  document.getElementById('statGainPct').textContent = fmtPct(gainPct);
+
+  const unrealizedEl = document.getElementById('statUnrealized');
+  unrealizedEl.textContent = (unrealized >= 0 ? '+' : '') + fmtMoney(unrealized);
+  unrealizedEl.className = 'sb-value ' + (unrealized > 0 ? 'pos' : unrealized < 0 ? 'neg' : '');
+  document.getElementById('statUnrealizedPct').textContent = fmtPct(unrealizedPct);
+
+  const realizedEl = document.getElementById('statRealized');
+  realizedEl.textContent = (realized >= 0 ? '+' : '') + fmtMoney(realized);
+  realizedEl.className = 'sb-value ' + (realized > 0 ? 'pos' : realized < 0 ? 'neg' : '');
+  document.getElementById('statRealizedPct').textContent = fmtPct(realizedPct);
 }
 
 function formatDateLabel(iso){
@@ -2069,6 +2188,16 @@ function populateSportFilter(){
   sel.value = sports.includes(current) ? current : 'all';
 }
 
+function populateTagFilter(){
+  const sel = document.getElementById('filterTag');
+  const current = sel.value || 'all';
+  const tagSet = new Set();
+  cards.forEach(c => { (Array.isArray(c.tags) ? c.tags : []).forEach(t => tagSet.add(t)); });
+  const tags = Array.from(tagSet).sort();
+  sel.innerHTML = '<option value="all">All tags</option>' + tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  sel.value = tags.includes(current) ? current : 'all';
+}
+
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
@@ -2090,17 +2219,19 @@ function isStale(c){
 
 function getFilteredSorted(){
   const sport = document.getElementById('filterSport').value;
+  const tag = document.getElementById('filterTag').value;
   const status = document.getElementById('filterStatus').value;
   const sortBy = document.getElementById('sortBy').value;
   const search = document.getElementById('searchInput').value.trim().toLowerCase();
 
   let list = cards.filter(c => {
     if(sport !== 'all' && (c.sport||'') !== sport) return false;
+    if(tag !== 'all' && !(Array.isArray(c.tags) && c.tags.includes(tag))) return false;
     if(status === 'stale' && !isStale(c)) return false;
     if(status === 'grading' && c.gradingStatus !== 'submitted') return false;
     if(status !== 'all' && status !== 'stale' && status !== 'grading' && c.status !== status) return false;
     if(search){
-      const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.notes].join(' ').toLowerCase();
+      const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.notes, ...(Array.isArray(c.tags)?c.tags:[])].join(' ').toLowerCase();
       if(!hay.includes(search)) return false;
     }
     return true;
@@ -2141,7 +2272,39 @@ function renderGrid(){
     return;
   }
 
-  area.innerHTML = `<div class="grid">${list.map(renderSlab).join('')}</div>`;
+  const groupBy = document.getElementById('groupBy').value;
+  if(groupBy === 'none'){
+    area.innerHTML = `<div class="grid">${list.map(renderSlab).join('')}</div>`;
+    return;
+  }
+
+  const groups = {};
+  list.forEach(c => {
+    const key = (c[groupBy] || '').trim() || `(No ${groupBy})`;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+  let groupKeys = Object.keys(groups);
+  if(groupBy === 'year'){
+    groupKeys.sort((a,b) => {
+      if(a.startsWith('(') ) return 1;
+      if(b.startsWith('(')) return -1;
+      return b.localeCompare(a);
+    });
+  }else{
+    groupKeys.sort((a,b) => {
+      if(a.startsWith('(')) return 1;
+      if(b.startsWith('(')) return -1;
+      return a.localeCompare(b);
+    });
+  }
+
+  area.innerHTML = groupKeys.map(key => `
+    <div class="group-section">
+      <div class="group-heading">${escapeHtml(key)} <span class="group-count">${groups[key].length}</span></div>
+      <div class="grid">${groups[key].map(renderSlab).join('')}</div>
+    </div>
+  `).join('');
 }
 
 function renderSlab(c){
@@ -2158,6 +2321,7 @@ function renderSlab(c){
 
   return `
     <div class="slab ${isSold ? 'sold' : ''}">
+      ${selectMode ? `<input type="checkbox" class="slab-select-box" onclick="event.stopPropagation(); toggleCardSelection('${c.id}')" ${selectedIds.has(c.id) ? 'checked' : ''}>` : ''}
       ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
       <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', ${coverIndex})"` : ''}>
         ${cover ? `<img src="${cover.dataUrl}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
@@ -2173,6 +2337,7 @@ function renderSlab(c){
       <div class="slab-body">
         <div class="slab-title">${escapeHtml(c.player || 'Untitled card')}</div>
         <div class="slab-meta">${escapeHtml(c.year || '')} ${escapeHtml(c.set || '')}${c.number ? ' &middot; #' + escapeHtml(c.number) : ''}${c.variant ? ' &middot; ' + escapeHtml(c.variant) : ''}</div>
+        ${Array.isArray(c.tags) && c.tags.length ? `<div class="tag-pills">${c.tags.map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         ${isStale(c) ? '<div class="stale-badge">⏱ Needs price check</div>' : ''}
         ${c.gradingStatus === 'submitted' ? `<div class="grading-badge">📦 At ${escapeHtml(c.gradingCompany || 'grader')}${daysSince(c.gradingSubmittedDate) !== null ? ' — ' + daysSince(c.gradingSubmittedDate) + ' days' : ''}</div>` : ''}
         <div class="slab-nums">
@@ -2186,10 +2351,150 @@ function renderSlab(c){
       <div class="slab-actions">
         <div class="icon-btn" onclick="openCardChart('${c.id}')">Chart</div>
         <div class="icon-btn" onclick="checkCardPrice('${c.id}')">Price ↗</div>
+        <div class="icon-btn" onclick="duplicateCard('${c.id}')">Duplicate</div>
         <div class="icon-btn" onclick="openModal('${c.id}')">Edit</div>
         <div class="icon-btn" onclick="deleteCard('${c.id}')">Delete</div>
       </div>
     </div>`;
+}
+
+function duplicateCard(id){
+  const c = cards.find(x => x.id === id);
+  if(!c) return;
+  openModal();
+  document.getElementById('f_player').value = c.player || '';
+  document.getElementById('f_sport').value = c.sport || '';
+  document.getElementById('f_year').value = c.year || '';
+  document.getElementById('f_set').value = c.set || '';
+  document.getElementById('f_number').value = c.number || '';
+  document.getElementById('f_variant').value = c.variant || '';
+  document.getElementById('f_grade').value = c.grade || '';
+  updateCheckPriceLink();
+}
+
+function openPrintView(){
+  const list = getFilteredSorted();
+  const totalValue = list.reduce((s,c) => s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+
+  const rows = list.map(c => {
+    const cover = (photos[c.id] || [])[0];
+    const value = c.status === 'sold' ? c.soldPrice : c.currentValue;
+    const cardDesc = [c.year, c.set, c.number ? '#'+c.number : '', c.variant].filter(Boolean).join(' ');
+    return `<tr>
+      <td>${cover ? `<img src="${cover.dataUrl}" style="width:46px;height:64px;object-fit:cover;border-radius:3px;">` : ''}</td>
+      <td>${escapeHtml(c.player||'')}</td>
+      <td>${escapeHtml(cardDesc)}</td>
+      <td>${escapeHtml(c.grade || 'Raw')}</td>
+      <td>${fmtMoney(c.purchasePrice)}</td>
+      <td>${fmtMoney(value)}</td>
+      <td>${c.status === 'sold' ? 'Sold' : 'Holding'}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><title>Revival Cards — Collection</title>
+<style>
+  body{font-family: Georgia, serif; padding:28px; color:#1C2541;}
+  h1{font-size:20px;margin:0 0 2px;}
+  .meta{font-size:12px;color:#555;margin-bottom:18px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{border-bottom:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:middle;}
+  th{background:#f0ece0;text-transform:uppercase;font-size:10px;letter-spacing:0.5px;}
+  .print-btn{margin-bottom:18px;padding:9px 18px;font-size:13px;cursor:pointer;border-radius:4px;border:1px solid #2B4735;background:#2B4735;color:#fff;}
+  @media print{ .print-btn{display:none;} }
+</style></head><body>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<h1>Revival Cards — Collection</h1>
+<div class="meta">${list.length} card${list.length===1?'':'s'} &middot; Total value ${fmtMoney(totalValue)} &middot; Generated ${new Date().toLocaleDateString()}</div>
+<table>
+  <thead><tr><th>Photo</th><th>Player</th><th>Card</th><th>Grade</th><th>Paid</th><th>Value</th><th>Status</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if(!win){ alert('Please allow pop-ups to open the print view.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+function toggleSelectMode(){
+  selectMode = !selectMode;
+  if(!selectMode) selectedIds.clear();
+  const btn = document.getElementById('selectModeBtn');
+  btn.textContent = selectMode ? 'Cancel select' : 'Select';
+  renderGrid();
+  updateSelectionBar();
+}
+
+function toggleCardSelection(id){
+  if(selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSelectionBar();
+  // Update just this checkbox's row highlight without a full re-render for responsiveness
+  renderGrid();
+}
+
+function updateSelectionBar(){
+  const bar = document.getElementById('selectionBar');
+  if(selectMode && selectedIds.size > 0){
+    bar.classList.remove('hidden');
+    document.getElementById('selectionCount').textContent = `${selectedIds.size} selected`;
+  }else{
+    bar.classList.add('hidden');
+  }
+}
+
+function exitSelectMode(){
+  selectMode = false;
+  selectedIds.clear();
+  document.getElementById('selectModeBtn').textContent = 'Select';
+  updateSelectionBar();
+  renderGrid();
+}
+
+async function bulkDeleteSelected(){
+  if(selectedIds.size === 0) return;
+  const count = selectedIds.size;
+  if(!confirm(`Move ${count} card${count===1?'':'s'} to trash? You can restore them within ${TRASH_RETENTION_DAYS} days.`)) return;
+  selectedIds.forEach(id => {
+    const card = cards.find(c => c.id === id);
+    if(card){
+      trash.push({ card, deletedAt: Date.now() });
+    }
+  });
+  cards = cards.filter(c => !selectedIds.has(c.id));
+  await saveData();
+  await saveTrash();
+  exitSelectMode();
+  renderAll();
+}
+
+function openBulkSoldModal(){
+  if(selectedIds.size === 0) return;
+  document.getElementById('bulkSoldSub').textContent = `This sold price and date will be applied to all ${selectedIds.size} selected cards.`;
+  document.getElementById('bulkSoldPrice').value = '';
+  document.getElementById('bulkSoldDate').value = todayIso();
+  document.getElementById('bulkSoldModalOverlay').classList.remove('hidden');
+}
+function closeBulkSoldModal(){
+  document.getElementById('bulkSoldModalOverlay').classList.add('hidden');
+}
+
+async function confirmBulkSold(){
+  const price = parseFloat(document.getElementById('bulkSoldPrice').value) || 0;
+  const date = document.getElementById('bulkSoldDate').value || todayIso();
+  selectedIds.forEach(id => {
+    const c = cards.find(x => x.id === id);
+    if(!c) return;
+    c.status = 'sold';
+    c.soldPrice = price;
+    c.soldDate = date;
+    pushHistoryPoint(c, date, price);
+  });
+  await saveData();
+  closeBulkSoldModal();
+  exitSelectMode();
+  renderAll();
 }
 
 function checkCardPrice(id){
@@ -2202,6 +2507,7 @@ function checkCardPrice(id){
 function renderAll(){
   renderSummary();
   populateSportFilter();
+  populateTagFilter();
   renderGrid();
   renderPortfolioChart();
   renderBreakdownChart();
@@ -2388,6 +2694,8 @@ function renderWatchCard(w){
 }
 
 let editingWatchId = null;
+let selectMode = false;
+let selectedIds = new Set();
 
 function openWatchModal(id){
   editingWatchId = id || null;
@@ -2552,6 +2860,7 @@ function openModal(id){
     document.getElementById('f_soldPrice').value = c.soldPrice ?? '';
     document.getElementById('f_soldDate').value = c.soldDate || '';
     document.getElementById('f_notes').value = c.notes || '';
+    document.getElementById('f_tags').value = Array.isArray(c.tags) ? c.tags.join(', ') : '';
     document.getElementById('statusHolding').checked = c.status !== 'sold';
     document.getElementById('statusSold').checked = c.status === 'sold';
     document.getElementById('f_atGrading').checked = c.gradingStatus === 'submitted';
@@ -2562,7 +2871,7 @@ function openModal(id){
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
     ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_purchasePrice',
-     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes',
+     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes','f_tags',
      'f_gradingCompany','f_gradingSubmittedDate'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -2643,12 +2952,22 @@ async function saveCard(){
     soldPrice: parseFloat(document.getElementById('f_soldPrice').value) || 0,
     soldDate: document.getElementById('f_soldDate').value,
     notes: document.getElementById('f_notes').value.trim(),
+    tags: document.getElementById('f_tags').value.split(',').map(t => t.trim()).filter(Boolean),
     gradingStatus: document.getElementById('f_atGrading').checked ? 'submitted' : '',
     gradingCompany: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingCompany').value.trim() : '',
     gradingSubmittedDate: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingSubmittedDate').value : '',
   };
 
   let targetId = editingId;
+
+  if(!editingId){
+    const key = cardDuplicateKey(data);
+    const dupe = cards.find(c => cardDuplicateKey(c) === key);
+    if(dupe){
+      const proceed = confirm(`You already have a card that matches this player, year, set, #, and variant ("${dupe.player}"). If you own more than one copy that's totally fine — just confirming this isn't an accidental double-entry.\n\nAdd it anyway?`);
+      if(!proceed) return;
+    }
+  }
 
   if(editingId){
     const idx = cards.findIndex(c => c.id === editingId);
@@ -2818,6 +3137,8 @@ document.getElementById('modalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'modalOverlay') closeModal();
 });
 document.getElementById('filterSport').addEventListener('change', renderGrid);
+document.getElementById('filterTag').addEventListener('change', renderGrid);
+document.getElementById('groupBy').addEventListener('change', renderGrid);
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
 document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
@@ -2865,6 +3186,17 @@ document.getElementById('lightboxNext').addEventListener('click', (e) => {
 });
 
 document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
+
+document.getElementById('printViewBtn').addEventListener('click', openPrintView);
+document.getElementById('selectModeBtn').addEventListener('click', toggleSelectMode);
+document.getElementById('bulkCancelBtn').addEventListener('click', exitSelectMode);
+document.getElementById('bulkDeleteBtn').addEventListener('click', bulkDeleteSelected);
+document.getElementById('bulkMarkSoldBtn').addEventListener('click', openBulkSoldModal);
+document.getElementById('bulkSoldCancelBtn').addEventListener('click', closeBulkSoldModal);
+document.getElementById('bulkSoldConfirmBtn').addEventListener('click', confirmBulkSold);
+document.getElementById('bulkSoldModalOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'bulkSoldModalOverlay') closeBulkSoldModal();
+});
 
 document.getElementById('scanCardBtn').addEventListener('click', openScanModal);
 document.getElementById('scanCancelBtn').addEventListener('click', closeScanModal);
