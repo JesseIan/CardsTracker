@@ -108,6 +108,32 @@
   }
   .btn-profile:hover{background:var(--ink);color:#F5F0E1;border-color:var(--ink);}
 
+  .trash-count{
+    display:inline-block;
+    background:var(--red);
+    color:#fff;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    font-weight:600;
+    padding:1px 6px;
+    border-radius:9px;
+    margin-left:5px;
+  }
+
+  .trash-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:10px 0;
+    border-top:1px solid var(--line);
+  }
+  .trash-row:first-child{border-top:none;}
+  .trash-name{font-family:'Oswald',sans-serif;font-size:14px;color:var(--ink);}
+  .trash-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .trash-actions{display:flex;gap:8px;flex:none;}
+  .trash-actions .icon-btn{flex:none;padding:6px 12px;}
+
   .danger-zone{
     margin-top:22px;
     padding-top:18px;
@@ -147,6 +173,23 @@
   .sb-value.pos{color:#D9C27A;}
   .sb-value.neg{color:#E39A9C;}
   .sb-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:4px;color:#B9C4AE;}
+
+  /* ---------- quick stats strip ---------- */
+  .quick-stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:12px;
+    margin-top:20px;
+  }
+  .qs-tile{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:12px 14px;
+  }
+  .qs-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;}
+  .qs-value{font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;color:var(--ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .qs-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:2px;}
 
   /* ---------- portfolio chart panel ---------- */
   .charts-row{
@@ -704,6 +747,7 @@
   <div class="topbar">
     <div class="user-welcome" id="userWelcome"></div>
     <div style="display:flex;gap:10px;">
+      <button class="btn-profile" id="trashBtn">🗑 Trash <span id="trashCount" class="trash-count hidden">0</span></button>
       <button class="btn-profile" id="profileBtn">Profile</button>
       <button class="btn-signout" id="signOutBtn">Sign out</button>
     </div>
@@ -737,6 +781,8 @@
   </div>
 
   <div id="collectionView">
+
+  <div class="quick-stats" id="quickStats"></div>
 
   <div class="charts-row">
     <div class="chart-panel">
@@ -791,6 +837,9 @@
     </div>
     <div style="display:flex;gap:10px;">
       <button class="btn secondary" id="exportBtn">Export CSV</button>
+      <button class="btn secondary" id="backupBtn">Full backup</button>
+      <button class="btn secondary" id="restoreBtn">Restore backup</button>
+      <input type="file" id="restoreFileInput" accept=".json" style="display:none;">
       <button class="btn secondary" id="importBtn">Import CSV</button>
       <input type="file" id="importFileInput" accept=".csv" style="display:none;">
       <button class="btn secondary" id="bulkAddBtn">Bulk add</button>
@@ -964,6 +1013,17 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="trashModalOverlay">
+  <div class="modal">
+    <h2>Trash</h2>
+    <p class="sub">Deleted cards stay here for 30 days before being removed permanently.</p>
+    <div id="trashListArea"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="trashCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="profileModalOverlay">
   <div class="modal">
     <h2>Profile</h2>
@@ -1126,6 +1186,7 @@ const STORAGE_KEY = 'portfolio';
 const PHOTOS_KEY = 'photos';
 let cards = [];
 let watchlist = [];
+let trash = [];
 let photos = {};
 let editingId = null;
 let modalPhotos = [];
@@ -1694,6 +1755,7 @@ async function loadData(){
     const data = snap.exists() ? snap.data() : {};
     cards = data.portfolioJson ? JSON.parse(data.portfolioJson) : [];
     watchlist = data.watchlistJson ? JSON.parse(data.watchlistJson) : [];
+    trash = data.trashJson ? JSON.parse(data.trashJson) : [];
     let anyRepaired = false;
     cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
     if(anyRepaired) await saveData();
@@ -1701,6 +1763,7 @@ async function loadData(){
     console.error('Load error', e);
     cards = [];
     watchlist = [];
+    trash = [];
   }
   try{
     photos = {};
@@ -1715,6 +1778,23 @@ async function loadData(){
     console.error('Photo load error', e);
     photos = {};
   }
+  await purgeExpiredTrash();
+}
+
+const TRASH_RETENTION_DAYS = 30;
+
+async function purgeExpiredTrash(){
+  if(trash.length === 0) return;
+  const cutoff = Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const expired = trash.filter(t => t.deletedAt < cutoff);
+  if(expired.length === 0) return;
+  for(const item of expired){
+    const arr = photos[item.card.id] || [];
+    for(const p of arr){ await deletePhotoDoc(p.id); }
+    delete photos[item.card.id];
+  }
+  trash = trash.filter(t => t.deletedAt >= cutoff);
+  await saveTrash();
 }
 
 function repairCardDates(card){
@@ -1748,6 +1828,12 @@ async function saveData(){
 async function saveWatchlist(){
   const fb = window.__fb;
   try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { watchlistJson: JSON.stringify(watchlist) }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
+}
+
+async function saveTrash(){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { trashJson: JSON.stringify(trash) }, { merge: true }); }
   catch(e){ console.error('Storage error', e); alert('Could not save — check your connection and try again.'); }
 }
 
@@ -2121,6 +2207,57 @@ function renderAll(){
   renderBreakdownChart();
   renderTopMovers();
   renderWatchlist();
+  renderQuickStats();
+  updateTrashBadge();
+}
+
+function updateTrashBadge(){
+  const badge = document.getElementById('trashCount');
+  if(trash.length > 0){
+    badge.textContent = String(trash.length);
+    badge.classList.remove('hidden');
+  }else{
+    badge.classList.add('hidden');
+  }
+}
+
+function renderQuickStats(){
+  const el = document.getElementById('quickStats');
+  if(cards.length === 0){ el.innerHTML = ''; return; }
+
+  const holding = cards.filter(c => c.status !== 'sold');
+  const sold = cards.filter(c => c.status === 'sold');
+
+  const valueOf = (c) => c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+  const mostValuable = cards.reduce((best, c) => valueOf(c) > valueOf(best) ? c : best, cards[0]);
+  const avgValue = holding.length ? holding.reduce((s,c) => s + (Number(c.currentValue)||0), 0) / holding.length : 0;
+
+  const graderCounts = {};
+  cards.forEach(c => {
+    const key = (c.grade || '').trim();
+    let label = 'Raw';
+    if(key){
+      const m = key.match(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/i);
+      label = m ? m[1].toUpperCase() : 'Graded';
+    }
+    graderCounts[label] = (graderCounts[label]||0) + 1;
+  });
+  const graderSummary = Object.entries(graderCounts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: ${v}`).join(' · ');
+
+  const tiles = [
+    { label: 'Total cards', value: String(cards.length), sub: `${holding.length} holding · ${sold.length} sold` },
+    { label: 'Most valuable', value: mostValuable.player || 'Untitled', sub: fmtMoney(valueOf(mostValuable)) },
+    { label: 'Avg. holding value', value: fmtMoney(avgValue), sub: `across ${holding.length} card${holding.length===1?'':'s'}` },
+    { label: 'By grader', value: graderSummary.split(' · ')[0] || '—', sub: graderSummary.split(' · ').slice(1).join(' · ') || '\u00A0' },
+  ];
+
+  el.innerHTML = tiles.map(t => `
+    <div class="qs-tile">
+      <div class="qs-label">${escapeHtml(t.label)}</div>
+      <div class="qs-value" title="${escapeHtml(t.value)}">${escapeHtml(t.value)}</div>
+      <div class="qs-sub">${escapeHtml(t.sub)}</div>
+    </div>
+  `).join('');
 }
 
 function renderBreakdownChart(){
@@ -2578,13 +2715,69 @@ async function saveCard(){
 }
 
 async function deleteCard(id){
-  if(!confirm('Delete this card from your portfolio?')) return;
+  const card = cards.find(c => c.id === id);
+  if(!card) return;
+  if(!confirm(`Move "${card.player || 'this card'}" to trash? You can restore it within ${TRASH_RETENTION_DAYS} days.`)) return;
   cards = cards.filter(c => c.id !== id);
+  trash.push({ card, deletedAt: Date.now() });
+  await saveData();
+  await saveTrash();
+  renderAll();
+}
+
+async function restoreFromTrash(id){
+  const item = trash.find(t => t.card.id === id);
+  if(!item) return;
+  trash = trash.filter(t => t.card.id !== id);
+  cards.push(item.card);
+  await saveData();
+  await saveTrash();
+  renderAll();
+  renderTrashModal();
+}
+
+async function permanentlyDeleteFromTrash(id){
+  const item = trash.find(t => t.card.id === id);
+  if(!item) return;
+  if(!confirm(`Permanently delete "${item.card.player || 'this card'}"? This cannot be undone.`)) return;
   const arr = photos[id] || [];
   for(const p of arr){ await deletePhotoDoc(p.id); }
   delete photos[id];
-  await saveData();
-  renderAll();
+  trash = trash.filter(t => t.card.id !== id);
+  await saveTrash();
+  renderTrashModal();
+}
+
+function openTrashModal(){
+  document.getElementById('trashModalOverlay').classList.remove('hidden');
+  renderTrashModal();
+}
+function closeTrashModal(){
+  document.getElementById('trashModalOverlay').classList.add('hidden');
+}
+
+function renderTrashModal(){
+  const area = document.getElementById('trashListArea');
+  if(trash.length === 0){
+    area.innerHTML = '<div class="empty"><h3>Trash is empty</h3><p>Deleted cards show up here for 30 days before being removed for good.</p></div>';
+    return;
+  }
+  const sorted = [...trash].sort((a,b) => b.deletedAt - a.deletedAt);
+  area.innerHTML = sorted.map(item => {
+    const c = item.card;
+    const daysLeft = Math.max(0, TRASH_RETENTION_DAYS - Math.floor((Date.now() - item.deletedAt) / (1000*60*60*24)));
+    return `
+      <div class="trash-row">
+        <div class="trash-info">
+          <div class="trash-name">${escapeHtml(c.player || 'Untitled card')}</div>
+          <div class="trash-meta">${escapeHtml(c.sport||'')} ${escapeHtml(c.year||'')} ${escapeHtml(c.set||'')} &middot; deleted ${escapeHtml(new Date(item.deletedAt).toLocaleDateString())} &middot; ${daysLeft} day${daysLeft===1?'':'s'} left</div>
+        </div>
+        <div class="trash-actions">
+          <div class="icon-btn" onclick="restoreFromTrash('${c.id}')">Restore</div>
+          <div class="icon-btn" onclick="permanentlyDeleteFromTrash('${c.id}')">Delete forever</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 let lightboxCardId = null;
@@ -2776,6 +2969,88 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
+function exportFullBackup(){
+  const backup = {
+    type: 'revival-cards-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    cards,
+    watchlist,
+    photos,
+  };
+  const json = JSON.stringify(backup);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `revival-cards-backup-${todayIso()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function restoreFullBackup(file){
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let backup;
+    try{
+      backup = JSON.parse(e.target.result);
+    }catch(err){
+      alert('That file doesn\'t look like a valid backup — could not read it as JSON.');
+      return;
+    }
+    if(!backup || backup.type !== 'revival-cards-backup' || !Array.isArray(backup.cards)){
+      alert('That file doesn\'t look like a Revival Cards backup.');
+      return;
+    }
+    const cardCount = backup.cards.length;
+    const photoCount = Object.values(backup.photos || {}).flat().length;
+    if(!confirm(`This will ADD ${cardCount} card${cardCount===1?'':'s'} and ${photoCount} photo${photoCount===1?'':'s'} from this backup to your current collection (nothing will be overwritten or removed). Continue?`)){
+      return;
+    }
+
+    try{
+      const idMap = {};
+      const newCards = backup.cards.map(c => {
+        const newId = uid();
+        idMap[c.id] = newId;
+        return { ...c, id: newId };
+      });
+
+      for(const oldId in (backup.photos || {})){
+        const newId = idMap[oldId];
+        if(!newId) continue;
+        const photoList = backup.photos[oldId] || [];
+        for(const p of photoList){
+          const newPhotoId = await addPhotoDoc(newId, p.label || 'Photo', p.dataUrl);
+          if(newPhotoId){
+            if(!photos[newId]) photos[newId] = [];
+            photos[newId].push({ id: newPhotoId, label: p.label || 'Photo', dataUrl: p.dataUrl });
+          }
+        }
+      }
+
+      cards = cards.concat(newCards);
+      await saveData();
+
+      if(Array.isArray(backup.watchlist) && backup.watchlist.length){
+        const newWatchItems = backup.watchlist.map(w => ({ ...w, id: uid() }));
+        watchlist = watchlist.concat(newWatchItems);
+        await saveWatchlist();
+      }
+
+      renderAll();
+      alert(`Restored ${cardCount} card${cardCount===1?'':'s'} from backup.`);
+    }catch(err){
+      console.error('Restore failed', err);
+      alert('Something went wrong restoring that backup. Check the console for details.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+
 function parseCsvText(text){
   const rows = [];
   let row = [];
@@ -2927,6 +3202,15 @@ function startApp(){
   });
 
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
+  document.getElementById('backupBtn').addEventListener('click', exportFullBackup);
+  document.getElementById('restoreBtn').addEventListener('click', () => {
+    document.getElementById('restoreFileInput').click();
+  });
+  document.getElementById('restoreFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) restoreFullBackup(file);
+    e.target.value = '';
+  });
   document.getElementById('importBtn').addEventListener('click', () => {
     document.getElementById('importFileInput').click();
   });
@@ -2934,6 +3218,13 @@ function startApp(){
     const file = e.target.files[0];
     if(file) importCsvFile(file);
     e.target.value = '';
+  });
+
+  // ---- Trash modal ----
+  document.getElementById('trashBtn').addEventListener('click', openTrashModal);
+  document.getElementById('trashCloseBtn').addEventListener('click', closeTrashModal);
+  document.getElementById('trashModalOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'trashModalOverlay') closeTrashModal();
   });
 
   // ---- Profile modal ----
@@ -3020,9 +3311,11 @@ function startApp(){
       currentUid = null;
       cards = [];
       watchlist = [];
+      trash = [];
       photos = {};
       document.getElementById('appWrap').classList.add('hidden');
       document.getElementById('profileModalOverlay').classList.add('hidden');
+      document.getElementById('trashModalOverlay').classList.add('hidden');
       document.getElementById('authScreen').classList.remove('hidden');
     }
   });
