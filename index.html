@@ -10,6 +10,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Revival Cards">
+<script>
+  try{
+    var savedTheme = localStorage.getItem('revivalCardsTheme');
+    if(savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  }catch(e){}
+</script>
 <link rel="icon" type="image/png" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,6 +69,24 @@
     --line: rgba(28,37,65,0.14);
     --line-strong: rgba(28,37,65,0.28);
   }
+  html[data-theme="dark"]{
+    --cream:#161A24;
+    --paper:#212736;
+    --ink:#EDE7D6;
+    --ink-soft:#A9AFC0;
+    --field:#3D6B4C;
+    --field-dark:#2A4A34;
+    --gold:#D9A94A;
+    --gold-dark:#C9A227;
+    --red:#D9777A;
+    --red-dark:#C85D5F;
+    --line: rgba(237,231,214,0.12);
+    --line-strong: rgba(237,231,214,0.24);
+  }
+  html[data-theme="dark"] body{background:var(--cream);}
+  html[data-theme="dark"] .slab-photo,
+  html[data-theme="dark"] .thumb,
+  html[data-theme="dark"] .photo-preview{background:#161A24;}
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -697,6 +721,56 @@
     font-family:'IBM Plex Mono',monospace;font-size:10px;
     padding:2px 7px;border-radius:10px;
   }
+  .holo-shine{
+    position:absolute;inset:0;
+    pointer-events:none;
+    mix-blend-mode:color-dodge;
+    opacity:0;
+    transition:opacity 0.2s ease;
+    background:linear-gradient(115deg,transparent 20%,#ff6b9d 30%,#ffd76b 40%,#6bffb0 50%,#6bc7ff 60%,#c66bff 70%,transparent 80%);
+    background-size:250% 250%;
+    background-position:50% 50%;
+  }
+  .slab-photo:hover .holo-shine{opacity:0.5;}
+
+  .achievements-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px,1fr));
+    gap:10px;
+    max-height:60vh;
+    overflow-y:auto;
+    padding:2px;
+  }
+  .achievement-tile{
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    padding:12px 10px;
+    text-align:center;
+    background:var(--paper);
+  }
+  .achievement-tile.locked{opacity:0.4;}
+  .achievement-tile.unlocked{border-color:var(--gold);background:rgba(184,137,43,0.08);}
+  .achievement-icon{font-size:26px;margin-bottom:6px;}
+  .achievement-label{font-family:'Oswald',sans-serif;font-size:12px;font-weight:600;color:var(--ink);}
+  .achievement-desc{font-size:10px;color:var(--ink-soft);margin-top:2px;}
+
+  .app-toast{
+    position:fixed;
+    bottom:24px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:#F0EBDC;
+    padding:12px 20px;
+    border-radius:8px;
+    font-family:'Oswald',sans-serif;
+    font-size:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.25);
+    opacity:0;
+    transition:opacity 0.3s, transform 0.3s;
+    z-index:9998;
+  }
+  .app-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .lightbox-caption{
     position:absolute;bottom:20px;left:0;right:0;
     text-align:center;color:#F0EBDC;
@@ -802,6 +876,9 @@
   <div class="topbar">
     <div class="user-welcome" id="userWelcome"></div>
     <div style="display:flex;gap:10px;">
+      <button class="btn-profile" id="darkModeBtn">🌙</button>
+      <button class="btn-profile" id="achievementsBtn">🏆</button>
+      <button class="btn-profile" id="shareStatsBtn">📤 Share</button>
       <button class="btn-profile" id="trashBtn">🗑 Trash <span id="trashCount" class="trash-count hidden">0</span></button>
       <button class="btn-profile" id="profileBtn">Profile</button>
       <button class="btn-signout" id="signOutBtn">Sign out</button>
@@ -1095,6 +1172,7 @@
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
       <div id="modalEditOnlyActions" class="hidden" style="display:flex;gap:10px;">
+        <button class="btn secondary" id="modalShareBtn">Share</button>
         <button class="btn secondary" id="modalDuplicateBtn">Duplicate</button>
         <button class="btn danger" id="modalDeleteBtn">Delete</button>
       </div>
@@ -1123,6 +1201,29 @@
     <div class="modal-actions">
       <button class="btn secondary" id="bulkSoldCancelBtn">Cancel</button>
       <button class="btn" id="bulkSoldConfirmBtn">Apply to selected</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="achievementsModalOverlay">
+  <div class="modal">
+    <h2>Achievements 🏆</h2>
+    <p class="sub">Little milestones as your collection grows.</p>
+    <div id="achievementsList" class="achievements-grid"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="achievementsCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="shareModalOverlay">
+  <div class="modal">
+    <h2>Share your stats</h2>
+    <p class="sub">A shareable snapshot of your portfolio — download it or take a screenshot.</p>
+    <img id="sharePreviewImg" style="width:100%;border-radius:8px;margin-top:8px;">
+    <div class="modal-actions">
+      <button class="btn secondary" id="shareCloseBtn">Close</button>
+      <button class="btn" id="shareDownloadBtn">Download image</button>
     </div>
   </div>
 </div>
@@ -1870,6 +1971,8 @@ async function loadData(){
     cards = data.portfolioJson ? JSON.parse(data.portfolioJson) : [];
     watchlist = data.watchlistJson ? JSON.parse(data.watchlistJson) : [];
     trash = data.trashJson ? JSON.parse(data.trashJson) : [];
+    unlockedAchievements = data.unlockedAchievementsJson ? JSON.parse(data.unlockedAchievementsJson) : [];
+    highestMilestoneCelebrated = Number(data.highestMilestoneCelebrated) || 0;
     let anyRepaired = false;
     cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
     if(anyRepaired) await saveData();
@@ -2335,6 +2438,7 @@ function renderSlab(c){
       ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
       <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', ${coverIndex})"` : ''}>
         ${cover ? `<img src="${cover.dataUrl}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
+        ${cover ? '<div class="holo-shine"></div>' : ''}
         ${cardPhotos.length > 1 ? `<span class="photo-count-badge">${coverIndex+1} / ${cardPhotos.length}</span>` : ''}
       </div>
       <div class="slab-label">
@@ -2524,6 +2628,9 @@ function renderAll(){
   renderWatchlist();
   renderQuickStats();
   updateTrashBadge();
+  checkAchievements(true);
+  checkValueMilestones();
+  checkAnniversaries();
 }
 
 function updateTrashBadge(){
@@ -3138,6 +3245,10 @@ function renderLightbox(){
 
 document.getElementById('addBtn').addEventListener('click', () => openModal());
 document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('modalShareBtn').addEventListener('click', () => {
+  const id = editingId;
+  if(id) openShareCardModal(id);
+});
 document.getElementById('modalDuplicateBtn').addEventListener('click', () => {
   const id = editingId;
   closeModal();
@@ -3166,6 +3277,17 @@ document.getElementById('modalOverlay').addEventListener('click', (e) => {
 document.getElementById('filterSport').addEventListener('change', renderGrid);
 document.getElementById('filterTag').addEventListener('change', renderGrid);
 document.getElementById('groupBy').addEventListener('change', renderGrid);
+
+document.getElementById('gridArea').addEventListener('mousemove', (e) => {
+  const photoEl = e.target.closest('.slab-photo');
+  if(!photoEl) return;
+  const shine = photoEl.querySelector('.holo-shine');
+  if(!shine) return;
+  const rect = photoEl.getBoundingClientRect();
+  const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+  const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+  shine.style.backgroundPosition = xPct + '% ' + yPct + '%';
+});
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
 document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
@@ -3273,6 +3395,364 @@ document.getElementById('bulkModalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'bulkModalOverlay') closeBulkModal();
 });
 document.getElementById('bulkTableBody').addEventListener('paste', handleBulkPaste);
+
+async function openShareCardModal(id){
+  const c = cards.find(x => x.id === id);
+  if(!c) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1350;
+  const ctx = canvas.getContext('2d');
+  try{ await document.fonts.ready; }catch(e){}
+
+  ctx.fillStyle = '#F2ECDD';
+  ctx.fillRect(0, 0, 1080, 1350);
+  ctx.fillStyle = '#2B4735';
+  ctx.fillRect(0, 0, 1080, 160);
+  ctx.fillStyle = '#F5F0E1';
+  ctx.font = '700 44px Oswald, sans-serif';
+  ctx.fillText('REVIVAL CARDS', 60, 90);
+  ctx.fillStyle = '#B9C4AE';
+  ctx.font = '500 18px "IBM Plex Mono", monospace';
+  ctx.fillText('CARD SPOTLIGHT', 62, 125);
+
+  const cover = (photos[c.id] || [])[0];
+  const drawRest = () => {
+    const isSold = c.status === 'sold';
+    const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+    const roi = cardRoi(c);
+    const gain = cardGainDollar(c);
+
+    ctx.fillStyle = '#1C2541';
+    ctx.font = '600 54px Oswald, sans-serif';
+    ctx.fillText(c.player || 'Untitled card', 60, 850);
+    ctx.fillStyle = '#3C4566';
+    ctx.font = '500 26px "IBM Plex Mono", monospace';
+    const meta = [c.year, c.set, c.number ? '#'+c.number : '', c.variant].filter(Boolean).join(' ');
+    ctx.fillText(meta, 60, 895);
+    ctx.fillStyle = '#8A6620';
+    ctx.font = '500 24px "IBM Plex Mono", monospace';
+    ctx.fillText(c.grade || 'Raw', 60, 935);
+
+    ctx.strokeStyle = 'rgba(28,37,65,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(60,980); ctx.lineTo(1020,980); ctx.stroke();
+
+    const cols = [
+      ['PAID', fmtMoney(c.purchasePrice)],
+      [isSold ? 'SOLD FOR' : 'CURRENT VALUE', fmtMoney(displayValue)],
+      ['ROI', (roi>=0?'+':'')+roi.toFixed(1)+'%'],
+    ];
+    const colWidth = 960/3;
+    cols.forEach((s,i) => {
+      const x = 60 + i*colWidth;
+      ctx.fillStyle = '#3C4566';
+      ctx.font = '500 18px "IBM Plex Mono", monospace';
+      ctx.fillText(s[0], x, 1040);
+      ctx.fillStyle = i===2 ? (roi>=0?'#8A6620':'#A63D40') : '#1C2541';
+      ctx.font = '600 38px Oswald, sans-serif';
+      ctx.fillText(s[1], x, 1090);
+    });
+
+    ctx.fillStyle = '#3C4566';
+    ctx.font = '400 18px "IBM Plex Mono", monospace';
+    ctx.fillText('Generated ' + new Date().toLocaleDateString(), 60, 1300);
+
+    document.getElementById('sharePreviewImg').src = canvas.toDataURL('image/png');
+    document.getElementById('shareModalOverlay').classList.remove('hidden');
+  };
+
+  if(cover){
+    const img = new Image();
+    img.onload = () => {
+      const boxW = 960, boxH = 560;
+      const scale = Math.min(boxW/img.width, boxH/img.height);
+      const w = img.width*scale, h = img.height*scale;
+      const x = 60 + (boxW-w)/2, y = 200 + (boxH-h)/2;
+      ctx.fillStyle = '#FBF7EC';
+      ctx.fillRect(60, 200, boxW, boxH);
+      ctx.drawImage(img, x, y, w, h);
+      drawRest();
+    };
+    img.onerror = drawRest;
+    img.src = cover.dataUrl;
+  }else{
+    drawRest();
+  }
+}
+
+async function openShareStatsModal(){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  try{ await document.fonts.ready; }catch(e){}
+
+  ctx.fillStyle = '#F2ECDD';
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  ctx.fillStyle = '#2B4735';
+  ctx.fillRect(0, 0, 1080, 220);
+  ctx.fillStyle = '#F5F0E1';
+  ctx.font = '700 56px Oswald, sans-serif';
+  ctx.fillText('REVIVAL CARDS', 60, 110);
+  ctx.fillStyle = '#B9C4AE';
+  ctx.font = '500 22px "IBM Plex Mono", monospace';
+  ctx.fillText('PORTFOLIO SNAPSHOT', 62, 155);
+
+  const invested = cards.reduce((s,c)=>s+(Number(c.purchasePrice)||0),0);
+  const value = cards.reduce((s,c)=>s+(c.status==='sold'?Number(c.soldPrice)||0:Number(c.currentValue)||0),0);
+  const gain = value - invested;
+  const gainPct = invested ? (gain/invested*100) : 0;
+
+  ctx.fillStyle = '#3C4566';
+  ctx.font = '500 24px "IBM Plex Mono", monospace';
+  ctx.fillText('CURRENT VALUE', 60, 320);
+  ctx.fillStyle = '#1C2541';
+  ctx.font = '600 108px Oswald, sans-serif';
+  ctx.fillText(fmtMoney(value), 58, 430);
+
+  ctx.fillStyle = gain >= 0 ? '#8A6620' : '#A63D40';
+  ctx.font = '600 40px Oswald, sans-serif';
+  ctx.fillText((gain>=0?'+':'')+fmtMoney(gain)+'  ('+(gainPct>=0?'+':'')+gainPct.toFixed(1)+'%)', 60, 488);
+
+  ctx.strokeStyle = 'rgba(28,37,65,0.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(60,540); ctx.lineTo(1020,540); ctx.stroke();
+
+  const stats = [
+    ['INVESTED', fmtMoney(invested)],
+    ['TOTAL CARDS', String(cards.length)],
+    ['HOLDING', String(cards.filter(c=>c.status!=='sold').length)],
+  ];
+  const colWidth = 960/3;
+  stats.forEach((s,i) => {
+    const x = 60 + i*colWidth;
+    ctx.fillStyle = '#3C4566';
+    ctx.font = '500 20px "IBM Plex Mono", monospace';
+    ctx.fillText(s[0], x, 600);
+    ctx.fillStyle = '#1C2541';
+    ctx.font = '600 44px Oswald, sans-serif';
+    ctx.fillText(s[1], x, 655);
+  });
+
+  if(cards.length){
+    const valueOf = (c) => c.status==='sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+    const top = cards.reduce((best,c) => valueOf(c) > valueOf(best) ? c : best, cards[0]);
+    ctx.strokeStyle = 'rgba(28,37,65,0.15)';
+    ctx.beginPath(); ctx.moveTo(60,720); ctx.lineTo(1020,720); ctx.stroke();
+    ctx.fillStyle = '#3C4566';
+    ctx.font = '500 20px "IBM Plex Mono", monospace';
+    ctx.fillText('TOP CARD', 60, 780);
+    ctx.fillStyle = '#1C2541';
+    ctx.font = '600 40px Oswald, sans-serif';
+    ctx.fillText(top.player || 'Untitled', 60, 830);
+    ctx.fillStyle = '#8A6620';
+    ctx.font = '500 30px "IBM Plex Mono", monospace';
+    ctx.fillText(fmtMoney(valueOf(top)), 60, 870);
+  }
+
+  ctx.fillStyle = '#3C4566';
+  ctx.font = '400 20px "IBM Plex Mono", monospace';
+  ctx.fillText('Generated ' + new Date().toLocaleDateString(), 60, 1020);
+
+  document.getElementById('sharePreviewImg').src = canvas.toDataURL('image/png');
+  document.getElementById('shareModalOverlay').classList.remove('hidden');
+}
+
+function fireConfetti(){
+  const canvas = document.createElement('canvas');
+  canvas.style.position = 'fixed';
+  canvas.style.inset = '0';
+  canvas.style.width = '100vw';
+  canvas.style.height = '100vh';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = '9999';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const colors = ['#B8892B', '#2B4735', '#A63D40', '#D9A94A', '#EDE7D6', '#3D6B4C'];
+  const particles = [];
+  const count = 140;
+  for(let i = 0; i < count; i++){
+    particles.push({
+      x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+      y: canvas.height * 0.35 + (Math.random() - 0.5) * 100,
+      vx: (Math.random() - 0.5) * 14,
+      vy: -Math.random() * 14 - 4,
+      size: Math.random() * 6 + 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 12,
+      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+    });
+  }
+
+  const gravity = 0.35;
+  const start = performance.now();
+  const duration = 2600;
+
+  function frame(now){
+    const elapsed = now - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.vy += gravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.rotSpeed;
+      const fade = Math.max(0, 1 - elapsed / duration);
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      if(p.shape === 'rect'){
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * 0.6);
+      }else{
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size/2, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+    if(elapsed < duration){
+      requestAnimationFrame(frame);
+    }else{
+      canvas.remove();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+const ACHIEVEMENTS = [
+  { id:'first_card', icon:'🎉', label:'First card', desc:'Add your first card', check: () => cards.length >= 1 },
+  { id:'ten_cards', icon:'📦', label:'Getting started', desc:'Reach 10 cards', check: () => cards.length >= 10 },
+  { id:'fifty_cards', icon:'🏛️', label:'Big collection', desc:'Reach 50 cards', check: () => cards.length >= 50 },
+  { id:'hundred_cards', icon:'👑', label:'Serious collector', desc:'Reach 100 cards', check: () => cards.length >= 100 },
+  { id:'first_sale', icon:'💰', label:'First sale', desc:'Sell a card', check: () => cards.some(c => c.status === 'sold') },
+  { id:'diamond_hands', icon:'💎', label:'Diamond hands', desc:'Hold a card a year or more', check: () => cards.some(c => c.status !== 'sold' && daysSince(c.purchaseDate) !== null && daysSince(c.purchaseDate) >= 365) },
+  { id:'diversified', icon:'🌐', label:'Diversified', desc:'Own cards from 5+ sports', check: () => new Set(cards.map(c => (c.sport||'').trim().toLowerCase()).filter(Boolean)).size >= 5 },
+  { id:'graded_up', icon:'🏅', label:'Graded up', desc:'Own 5+ graded cards', check: () => cards.filter(c => c.grade && c.grade.trim() && c.grade.trim().toLowerCase() !== 'raw').length >= 5 },
+  { id:'in_the_green', icon:'📈', label:'In the green', desc:'Positive overall gain', check: () => {
+    const invested = cards.reduce((s,c)=>s+(Number(c.purchasePrice)||0),0);
+    const value = cards.reduce((s,c)=>s+(c.status==='sold'?Number(c.soldPrice)||0:Number(c.currentValue)||0),0);
+    return invested > 0 && value > invested;
+  }},
+  { id:'photographer', icon:'📸', label:'Photographer', desc:'Add photos to 5+ cards', check: () => Object.values(photos).filter(arr => arr && arr.length > 0).length >= 5 },
+  { id:'organized', icon:'🏷️', label:'Organized', desc:'Tag 3+ cards', check: () => cards.filter(c => Array.isArray(c.tags) && c.tags.length > 0).length >= 3 },
+  { id:'window_shopper', icon:'👀', label:'Window shopper', desc:'Add something to your watchlist', check: () => watchlist.length >= 1 },
+];
+
+let unlockedAchievements = [];
+let highestMilestoneCelebrated = 0;
+let anniversaryShownThisSession = false;
+const VALUE_MILESTONES = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
+
+async function saveMilestone(){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { highestMilestoneCelebrated }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); }
+}
+
+function checkValueMilestones(){
+  if(cards.length === 0) return;
+  const value = cards.reduce((s,c) => s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+  const crossed = VALUE_MILESTONES.filter(m => value >= m && m > highestMilestoneCelebrated);
+  if(crossed.length > 0){
+    const newHigh = Math.max(...crossed);
+    highestMilestoneCelebrated = newHigh;
+    saveMilestone();
+    fireConfetti();
+    showToast(`🎉 Your portfolio crossed ${fmtMoney(newHigh)}!`);
+  }
+}
+
+function checkAnniversaries(){
+  if(anniversaryShownThisSession || cards.length === 0) return;
+  const today = new Date();
+  const todayKey = `${today.getMonth()}-${today.getDate()}`;
+  const match = cards.find(c => {
+    if(!c.purchaseDate) return false;
+    const d = new Date(c.purchaseDate);
+    if(isNaN(d.getTime())) return false;
+    const yearsHeld = today.getFullYear() - d.getFullYear();
+    return yearsHeld >= 1 && `${d.getMonth()}-${d.getDate()}` === todayKey;
+  });
+  if(match){
+    anniversaryShownThisSession = true;
+    const years = today.getFullYear() - new Date(match.purchaseDate).getFullYear();
+    showToast(`📅 You've owned "${match.player}" for ${years} year${years===1?'':'s'} today!`);
+  }
+}
+
+
+
+async function saveUnlockedAchievements(){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { unlockedAchievementsJson: JSON.stringify(unlockedAchievements) }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); }
+}
+
+function checkAchievements(celebrateNew){
+  const nowUnlocked = ACHIEVEMENTS.filter(a => a.check()).map(a => a.id);
+  const newlyUnlocked = nowUnlocked.filter(id => !unlockedAchievements.includes(id));
+  if(newlyUnlocked.length > 0){
+    unlockedAchievements = Array.from(new Set([...unlockedAchievements, ...newlyUnlocked]));
+    saveUnlockedAchievements();
+    if(celebrateNew){
+      fireConfetti();
+      const first = ACHIEVEMENTS.find(a => a.id === newlyUnlocked[0]);
+      if(first) showToast(`🏆 Achievement unlocked: ${first.label}`);
+    }
+  }
+}
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'app-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 10);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 3600);
+}
+
+function renderAchievementsModal(){
+  const el = document.getElementById('achievementsList');
+  el.innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = unlockedAchievements.includes(a.id);
+    return `
+      <div class="achievement-tile ${unlocked ? 'unlocked' : 'locked'}">
+        <div class="achievement-icon">${a.icon}</div>
+        <div class="achievement-label">${escapeHtml(a.label)}</div>
+        <div class="achievement-desc">${escapeHtml(a.desc)}</div>
+      </div>`;
+  }).join('');
+}
+
+function isDarkMode(){
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function applyChartTheme(){
+  if(window.Chart){
+    Chart.defaults.color = isDarkMode() ? '#A9AFC0' : '#3C4566';
+    Chart.defaults.borderColor = isDarkMode() ? 'rgba(237,231,214,0.12)' : 'rgba(28,37,65,0.1)';
+  }
+}
+
+function toggleDarkMode(){
+  const dark = !isDarkMode();
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.getElementById('darkModeBtn').textContent = dark ? '☀️' : '🌙';
+  try{ localStorage.setItem('revivalCardsTheme', dark ? 'dark' : 'light'); }catch(e){}
+  applyChartTheme();
+  if(cards.length){
+    renderPortfolioChart();
+    renderBreakdownChart();
+  }
+}
 
 function nameFromEmail(email){
   const local = (email.split('@')[0] || '').replace(/[._-]+/g, ' ').trim();
@@ -3557,6 +4037,10 @@ function importCsvFile(file){
 function startApp(){
   const fb = window.__fb;
 
+  if(isDarkMode()) document.getElementById('darkModeBtn').textContent = '☀️';
+  applyChartTheme();
+  document.getElementById('darkModeBtn').addEventListener('click', toggleDarkMode);
+
   document.getElementById('authSigninBtn').addEventListener('click', async () => {
     clearAuthError();
     const email = document.getElementById('auth_email').value.trim();
@@ -3600,6 +4084,34 @@ function startApp(){
 
   // ---- Trash modal ----
   document.getElementById('trashBtn').addEventListener('click', openTrashModal);
+
+  document.getElementById('achievementsBtn').addEventListener('click', () => {
+    renderAchievementsModal();
+    document.getElementById('achievementsModalOverlay').classList.remove('hidden');
+  });
+  document.getElementById('achievementsCloseBtn').addEventListener('click', () => {
+    document.getElementById('achievementsModalOverlay').classList.add('hidden');
+  });
+  document.getElementById('achievementsModalOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'achievementsModalOverlay') document.getElementById('achievementsModalOverlay').classList.add('hidden');
+  });
+
+  document.getElementById('shareStatsBtn').addEventListener('click', openShareStatsModal);
+  document.getElementById('shareCloseBtn').addEventListener('click', () => {
+    document.getElementById('shareModalOverlay').classList.add('hidden');
+  });
+  document.getElementById('shareModalOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'shareModalOverlay') document.getElementById('shareModalOverlay').classList.add('hidden');
+  });
+  document.getElementById('shareDownloadBtn').addEventListener('click', () => {
+    const img = document.getElementById('sharePreviewImg');
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = `revival-cards-stats-${todayIso()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
   document.getElementById('trashCloseBtn').addEventListener('click', closeTrashModal);
   document.getElementById('trashModalOverlay').addEventListener('click', (e) => {
     if(e.target.id === 'trashModalOverlay') closeTrashModal();
@@ -3691,6 +4203,9 @@ function startApp(){
       watchlist = [];
       trash = [];
       photos = {};
+      unlockedAchievements = [];
+      highestMilestoneCelebrated = 0;
+      anniversaryShownThisSession = false;
       document.getElementById('appWrap').classList.add('hidden');
       document.getElementById('profileModalOverlay').classList.add('hidden');
       document.getElementById('trashModalOverlay').classList.add('hidden');
