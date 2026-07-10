@@ -26,7 +26,7 @@
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
     signOut, onAuthStateChanged, updateProfile, deleteUser,
-    reauthenticateWithCredential, EmailAuthProvider
+    reauthenticateWithCredential, EmailAuthProvider, updatePassword, verifyBeforeUpdateEmail
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc, deleteDoc,
@@ -50,7 +50,8 @@
   window.__fb = {
     auth, db, doc, getDoc, setDoc, deleteDoc, collection, getDocs,
     createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-    updateProfile, deleteUser, reauthenticateWithCredential, EmailAuthProvider
+    updateProfile, deleteUser, reauthenticateWithCredential, EmailAuthProvider,
+    updatePassword, verifyBeforeUpdateEmail
   };
   window.dispatchEvent(new Event('firebase-ready'));
 </script>
@@ -157,6 +158,35 @@
   .trash-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .trash-actions{display:flex;gap:8px;flex:none;}
   .trash-actions .icon-btn{flex:none;padding:6px 12px;}
+
+  .profile-avatar{
+    width:64px;height:64px;border-radius:50%;
+    background:var(--field);color:#F5F0E1;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Oswald',sans-serif;font-size:24px;font-weight:600;
+    overflow:hidden;flex-shrink:0;
+  }
+  .profile-avatar img{width:100%;height:100%;object-fit:cover;}
+  .topbar-avatar{
+    width:30px;height:30px;border-radius:50%;
+    background:var(--field);color:#F5F0E1;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;
+    overflow:hidden;flex-shrink:0;
+  }
+  .topbar-avatar img{width:100%;height:100%;object-fit:cover;}
+
+  .account-summary{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--line-strong);
+  }
+  .account-summary-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(110px,1fr));
+    gap:10px;
+  }
+  .account-summary-grid .qs-tile{padding:10px 12px;}
 
   .danger-zone{
     margin-top:22px;
@@ -877,7 +907,10 @@
 <div class="wrap hidden" id="appWrap">
 
   <div class="topbar">
-    <div class="user-welcome" id="userWelcome"></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="topbarAvatar" class="topbar-avatar">?</div>
+      <div class="user-welcome" id="userWelcome"></div>
+    </div>
     <div style="display:flex;gap:10px;">
       <button class="btn-profile" id="darkModeBtn">🌙</button>
       <button class="btn-profile" id="achievementsBtn">🏆</button>
@@ -1243,9 +1276,18 @@
 </div>
 
 <div class="modal-overlay hidden" id="profileModalOverlay">
-  <div class="modal">
+  <div class="modal" style="max-height:88vh;overflow-y:auto;">
     <h2>Profile</h2>
-    <p class="sub">Update your display name or manage your account.</p>
+    <p class="sub">Update your details or manage your account.</p>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div id="profileAvatarPreview" class="profile-avatar">?</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <input type="file" id="profile_avatarInput" accept="image/*" style="display:none;">
+        <div class="icon-btn" id="profileAvatarUploadBtn" style="flex:none;padding:6px 14px;">Change photo</div>
+        <div class="icon-btn" id="profileAvatarRemoveBtn" style="flex:none;padding:6px 14px;">Remove</div>
+      </div>
+    </div>
 
     <div class="field full" style="margin-bottom:12px;">
       <label>Display name</label>
@@ -1260,6 +1302,52 @@
     <div class="modal-actions">
       <button class="btn secondary" id="profileCancelBtn">Close</button>
       <button class="btn" id="profileSaveBtn">Save name</button>
+    </div>
+
+    <div class="account-summary">
+      <div class="danger-zone-title" style="color:var(--ink-soft);">Account summary</div>
+      <div class="account-summary-grid" id="accountSummaryGrid"></div>
+    </div>
+
+    <div class="danger-zone">
+      <div class="danger-zone-title" style="color:var(--ink-soft);">Change password</div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Current password</label>
+          <input type="password" id="pw_current" placeholder="Current password">
+        </div>
+        <div class="field">
+          <label>New password</label>
+          <input type="password" id="pw_new" placeholder="At least 6 characters">
+        </div>
+        <div class="field">
+          <label>Confirm new password</label>
+          <input type="password" id="pw_confirm" placeholder="Repeat new password">
+        </div>
+      </div>
+      <div id="pwMsg" class="auth-error hidden" style="margin-top:8px;"></div>
+      <div class="modal-actions" style="margin-top:10px;">
+        <button class="btn secondary" id="pwChangeBtn">Change password</button>
+      </div>
+    </div>
+
+    <div class="danger-zone">
+      <div class="danger-zone-title" style="color:var(--ink-soft);">Change email</div>
+      <p class="sub" style="margin:0 0 10px;">You'll get a verification link at the new address — your email won't change until you click it.</p>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Current password</label>
+          <input type="password" id="email_password" placeholder="Current password">
+        </div>
+        <div class="field full">
+          <label>New email</label>
+          <input type="email" id="email_new" placeholder="you@example.com">
+        </div>
+      </div>
+      <div id="emailMsg" class="auth-error hidden" style="margin-top:8px;"></div>
+      <div class="modal-actions" style="margin-top:10px;">
+        <button class="btn secondary" id="emailChangeBtn">Send verification link</button>
+      </div>
     </div>
 
     <div class="danger-zone">
@@ -1976,6 +2064,7 @@ async function loadData(){
     trash = data.trashJson ? JSON.parse(data.trashJson) : [];
     unlockedAchievements = data.unlockedAchievementsJson ? JSON.parse(data.unlockedAchievementsJson) : [];
     highestMilestoneCelebrated = Number(data.highestMilestoneCelebrated) || 0;
+    userAvatarDataUrl = data.avatarDataUrl || null;
     let anyRepaired = false;
     cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
     if(anyRepaired) await saveData();
@@ -3660,6 +3749,8 @@ const ACHIEVEMENTS = [
 ];
 
 let unlockedAchievements = [];
+let userAvatarDataUrl = null;
+let pendingAvatarDataUrl = undefined;
 let highestMilestoneCelebrated = 0;
 let anniversaryShownThisSession = false;
 const VALUE_MILESTONES = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000];
@@ -3797,6 +3888,51 @@ function friendlyAuthError(e){
 function updateWelcomeText(user){
   const name = user.displayName && user.displayName.trim() ? user.displayName.trim() : nameFromEmail(user.email || '');
   document.getElementById('userWelcome').innerHTML = `Welcome, <strong>${escapeHtml(name)}</strong>`;
+  renderTopbarAvatar(name);
+}
+
+function renderTopbarAvatar(name){
+  const el = document.getElementById('topbarAvatar');
+  if(userAvatarDataUrl){
+    el.innerHTML = `<img src="${userAvatarDataUrl}" alt="avatar">`;
+  }else{
+    el.textContent = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  }
+}
+
+function renderProfileAvatarPreview(user){
+  const el = document.getElementById('profileAvatarPreview');
+  const src = pendingAvatarDataUrl !== undefined ? pendingAvatarDataUrl : userAvatarDataUrl;
+  if(src){
+    el.innerHTML = `<img src="${src}" alt="avatar">`;
+  }else{
+    const name = user.displayName && user.displayName.trim() ? user.displayName.trim() : nameFromEmail(user.email || '');
+    el.textContent = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  }
+}
+
+function renderAccountSummary(user){
+  const el = document.getElementById('accountSummaryGrid');
+  const created = user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime) : null;
+  const photoCount = Object.values(photos).flat().length;
+  const tiles = [
+    { label: 'Member since', value: created ? created.toLocaleDateString(undefined,{month:'short',year:'numeric'}) : '—' },
+    { label: 'Total cards', value: String(cards.length) },
+    { label: 'Photos', value: String(photoCount) },
+    { label: 'Achievements', value: `${unlockedAchievements.length}/${ACHIEVEMENTS.length}` },
+  ];
+  el.innerHTML = tiles.map(t => `
+    <div class="qs-tile">
+      <div class="qs-label">${escapeHtml(t.label)}</div>
+      <div class="qs-value">${escapeHtml(t.value)}</div>
+    </div>
+  `).join('');
+}
+
+async function saveAvatar(dataUrl){
+  const fb = window.__fb;
+  try{ await fb.setDoc(fb.doc(fb.db, 'users', currentUid), { avatarDataUrl: dataUrl }, { merge: true }); }
+  catch(e){ console.error('Storage error', e); alert('Could not save photo — check your connection and try again.'); }
 }
 
 function exportCsv(){
@@ -4143,6 +4279,16 @@ function startApp(){
     document.getElementById('deleteConfirmSection').classList.add('hidden');
     document.getElementById('delete_password').value = '';
     document.getElementById('deleteMsg').classList.add('hidden');
+    document.getElementById('pw_current').value = '';
+    document.getElementById('pw_new').value = '';
+    document.getElementById('pw_confirm').value = '';
+    document.getElementById('pwMsg').classList.add('hidden');
+    document.getElementById('email_password').value = '';
+    document.getElementById('email_new').value = '';
+    document.getElementById('emailMsg').classList.add('hidden');
+    pendingAvatarDataUrl = undefined;
+    renderProfileAvatarPreview(user);
+    renderAccountSummary(user);
     document.getElementById('profileModalOverlay').classList.remove('hidden');
   });
   document.getElementById('profileCancelBtn').addEventListener('click', () => {
@@ -4157,6 +4303,11 @@ function startApp(){
     const name = document.getElementById('profile_displayName').value.trim();
     try{
       await fb.updateProfile(fb.auth.currentUser, { displayName: name });
+      if(pendingAvatarDataUrl !== undefined){
+        userAvatarDataUrl = pendingAvatarDataUrl;
+        await saveAvatar(userAvatarDataUrl);
+        pendingAvatarDataUrl = undefined;
+      }
       updateWelcomeText(fb.auth.currentUser);
       msg.textContent = 'Saved.';
       msg.style.color = 'var(--field-dark)';
@@ -4168,7 +4319,93 @@ function startApp(){
     }
   });
 
+  document.getElementById('profileAvatarUploadBtn').addEventListener('click', () => {
+    document.getElementById('profile_avatarInput').click();
+  });
+  document.getElementById('profile_avatarInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      pendingAvatarDataUrl = await resizeImage(file);
+      renderProfileAvatarPreview(fb.auth.currentUser);
+    }catch(err){
+      console.error('Avatar processing failed', err);
+    }
+  });
+  document.getElementById('profileAvatarRemoveBtn').addEventListener('click', () => {
+    pendingAvatarDataUrl = null;
+    renderProfileAvatarPreview(fb.auth.currentUser);
+  });
+
   // ---- Account deletion ----
+  // ---- Change password ----
+  document.getElementById('pwChangeBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('pwMsg');
+    msg.classList.add('hidden');
+    const current = document.getElementById('pw_current').value;
+    const next = document.getElementById('pw_new').value;
+    const confirm = document.getElementById('pw_confirm').value;
+    if(!current || !next){
+      msg.textContent = 'Fill in both your current and new password.';
+      msg.classList.remove('hidden');
+      return;
+    }
+    if(next.length < 6){
+      msg.textContent = 'New password should be at least 6 characters.';
+      msg.classList.remove('hidden');
+      return;
+    }
+    if(next !== confirm){
+      msg.textContent = 'New password and confirmation don\'t match.';
+      msg.classList.remove('hidden');
+      return;
+    }
+    try{
+      const user = fb.auth.currentUser;
+      const cred = fb.EmailAuthProvider.credential(user.email, current);
+      await fb.reauthenticateWithCredential(user, cred);
+      await fb.updatePassword(user, next);
+      document.getElementById('pw_current').value = '';
+      document.getElementById('pw_new').value = '';
+      document.getElementById('pw_confirm').value = '';
+      msg.style.color = 'var(--field-dark)';
+      msg.textContent = 'Password changed.';
+      msg.classList.remove('hidden');
+    }catch(e){
+      msg.style.color = '';
+      msg.textContent = friendlyAuthError(e);
+      msg.classList.remove('hidden');
+    }
+  });
+
+  // ---- Change email ----
+  document.getElementById('emailChangeBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('emailMsg');
+    msg.classList.add('hidden');
+    const password = document.getElementById('email_password').value;
+    const newEmail = document.getElementById('email_new').value.trim();
+    if(!password || !newEmail){
+      msg.textContent = 'Enter your current password and a new email.';
+      msg.classList.remove('hidden');
+      return;
+    }
+    try{
+      const user = fb.auth.currentUser;
+      const cred = fb.EmailAuthProvider.credential(user.email, password);
+      await fb.reauthenticateWithCredential(user, cred);
+      await fb.verifyBeforeUpdateEmail(user, newEmail);
+      document.getElementById('email_password').value = '';
+      document.getElementById('email_new').value = '';
+      msg.style.color = 'var(--field-dark)';
+      msg.textContent = `Verification link sent to ${newEmail}. Your email updates once you click it.`;
+      msg.classList.remove('hidden');
+    }catch(e){
+      msg.style.color = '';
+      msg.textContent = friendlyAuthError(e);
+      msg.classList.remove('hidden');
+    }
+  });
+
   document.getElementById('deleteAccountBtn').addEventListener('click', () => {
     document.getElementById('deleteConfirmSection').classList.remove('hidden');
   });
@@ -4222,6 +4459,9 @@ function startApp(){
       unlockedAchievements = [];
       highestMilestoneCelebrated = 0;
       anniversaryShownThisSession = false;
+      userAvatarDataUrl = null;
+      pendingAvatarDataUrl = undefined;
+      document.getElementById('topbarAvatar').textContent = '?';
       document.getElementById('appWrap').classList.add('hidden');
       document.getElementById('profileModalOverlay').classList.add('hidden');
       document.getElementById('trashModalOverlay').classList.add('hidden');
