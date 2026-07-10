@@ -2990,6 +2990,16 @@ function exportFullBackup(){
   URL.revokeObjectURL(url);
 }
 
+function cardDuplicateKey(c){
+  return [
+    (c.player||'').trim().toLowerCase(),
+    (c.year||'').trim().toLowerCase(),
+    (c.set||'').trim().toLowerCase(),
+    (c.number||'').trim().toLowerCase(),
+    (c.variant||'').trim().toLowerCase(),
+  ].join('|');
+}
+
 function restoreFullBackup(file){
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -3006,7 +3016,14 @@ function restoreFullBackup(file){
     }
     const cardCount = backup.cards.length;
     const photoCount = Object.values(backup.photos || {}).flat().length;
-    if(!confirm(`This will ADD ${cardCount} card${cardCount===1?'':'s'} and ${photoCount} photo${photoCount===1?'':'s'} from this backup to your current collection (nothing will be overwritten or removed). Continue?`)){
+
+    const existingKeys = new Set(cards.map(cardDuplicateKey));
+    const dupeCount = backup.cards.filter(c => existingKeys.has(cardDuplicateKey(c))).length;
+    const dupeNote = dupeCount > 0
+      ? `\n\nHeads up: ${dupeCount} of these look like cards you already have (same player, year, set, #, and variant). They'll be added as separate entries rather than skipped, in case you genuinely own more than one copy — just know your totals will include both.`
+      : '';
+
+    if(!confirm(`This will ADD ${cardCount} card${cardCount===1?'':'s'} and ${photoCount} photo${photoCount===1?'':'s'} from this backup to your current collection (nothing will be overwritten or removed).${dupeNote}\n\nContinue?`)){
       return;
     }
 
