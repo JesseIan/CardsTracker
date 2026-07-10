@@ -1097,9 +1097,14 @@
         <textarea id="w_notes" placeholder="Where to find it, condition to look for, etc."></textarea>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn secondary" id="watchCancelBtn">Cancel</button>
-      <button class="btn" id="watchSaveBtn">Save</button>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <div id="watchModalEditOnlyActions" class="hidden">
+        <button class="btn danger" id="watchModalRemoveBtn">Remove</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn secondary" id="watchCancelBtn">Cancel</button>
+        <button class="btn" id="watchSaveBtn">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2897,7 +2902,6 @@ function renderWatchCard(w){
         <div class="icon-btn" onclick="checkWatchPrice('${w.id}')">Find on eBay ↗</div>
         <div class="icon-btn" onclick="openWatchModal('${w.id}')">Edit</div>
         <div class="icon-btn" onclick="moveWatchToCollection('${w.id}')">Move to collection</div>
-        <div class="icon-btn" onclick="deleteWatchItem('${w.id}')">Remove</div>
       </div>
     </div>`;
 }
@@ -2932,6 +2936,7 @@ function openWatchModal(id){
       document.getElementById(id).value = '';
     });
   }
+  document.getElementById('watchModalEditOnlyActions').classList.toggle('hidden', !id);
   document.getElementById('watchModalOverlay').classList.remove('hidden');
 }
 
@@ -3499,6 +3504,14 @@ document.getElementById('tabWatchlistBtn').addEventListener('click', () => switc
 
 document.getElementById('addWatchBtn').addEventListener('click', () => openWatchModal());
 document.getElementById('watchCancelBtn').addEventListener('click', closeWatchModal);
+document.getElementById('watchModalRemoveBtn').addEventListener('click', async () => {
+  const id = editingWatchId;
+  if(!id) return;
+  await deleteWatchItem(id);
+  if(!watchlist.some(w => w.id === id)){
+    closeWatchModal();
+  }
+});
 document.getElementById('watchSaveBtn').addEventListener('click', saveWatchItem);
 document.getElementById('watchModalOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'watchModalOverlay') closeWatchModal();
