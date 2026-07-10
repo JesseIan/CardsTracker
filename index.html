@@ -2894,11 +2894,19 @@ function renderWatchCard(w){
       ${hasBoth ? `<div class="watch-diff ${diff > 0 ? 'pos' : 'neg'}">${diff > 0 ? 'Above target by ' + fmtMoney(diff) : 'At or below target by ' + fmtMoney(Math.abs(diff))}</div>` : ''}
       ${w.notes ? `<div class="watch-notes">${escapeHtml(w.notes)}</div>` : ''}
       <div class="watch-actions">
+        <div class="icon-btn" onclick="checkWatchPrice('${w.id}')">Find on eBay ↗</div>
         <div class="icon-btn" onclick="openWatchModal('${w.id}')">Edit</div>
         <div class="icon-btn" onclick="moveWatchToCollection('${w.id}')">Move to collection</div>
         <div class="icon-btn" onclick="deleteWatchItem('${w.id}')">Remove</div>
       </div>
     </div>`;
+}
+
+function checkWatchPrice(id){
+  const w = watchlist.find(x => x.id === id);
+  if(!w) return;
+  const url = buildEbayActiveSearchUrl(w.player, w.year, w.set, w.variant);
+  window.open(url, '_blank', 'noopener');
 }
 
 let editingWatchId = null;
@@ -3117,6 +3125,12 @@ function buildEbaySearchUrl(player, year, set, variant, grade){
   const parts = [player, year, set, variant, grade].map(p => (p||'').trim()).filter(Boolean);
   const q = encodeURIComponent(parts.join(' '));
   return `https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`;
+}
+
+function buildEbayActiveSearchUrl(player, year, set, variant, grade){
+  const parts = [player, year, set, variant, grade].map(p => (p||'').trim()).filter(Boolean);
+  const q = encodeURIComponent(parts.join(' '));
+  return `https://www.ebay.com/sch/i.html?_nkw=${q}`;
 }
 
 function updateCheckPriceLink(){
