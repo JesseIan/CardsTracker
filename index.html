@@ -1089,9 +1089,15 @@
         <textarea id="f_notes" placeholder="Where you bought it, condition notes, etc."></textarea>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn secondary" id="cancelBtn">Cancel</button>
-      <button class="btn" id="saveBtn">Save card</button>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <div id="modalEditOnlyActions" class="hidden" style="display:flex;gap:10px;">
+        <button class="btn secondary" id="modalDuplicateBtn">Duplicate</button>
+        <button class="btn danger" id="modalDeleteBtn">Delete</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn secondary" id="cancelBtn">Cancel</button>
+        <button class="btn" id="saveBtn">Save card</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2351,9 +2357,7 @@ function renderSlab(c){
       <div class="slab-actions">
         <div class="icon-btn" onclick="openCardChart('${c.id}')">Chart</div>
         <div class="icon-btn" onclick="checkCardPrice('${c.id}')">Price ↗</div>
-        <div class="icon-btn" onclick="duplicateCard('${c.id}')">Duplicate</div>
         <div class="icon-btn" onclick="openModal('${c.id}')">Edit</div>
-        <div class="icon-btn" onclick="deleteCard('${c.id}')">Delete</div>
       </div>
     </div>`;
 }
@@ -2885,6 +2889,7 @@ function openModal(id){
   toggleGradingFields();
   updateCheckPriceLink();
   renderModalPhotos();
+  document.getElementById('modalEditOnlyActions').classList.toggle('hidden', !id);
   overlay.classList.remove('hidden');
 }
 
@@ -3126,6 +3131,21 @@ function renderLightbox(){
 
 document.getElementById('addBtn').addEventListener('click', () => openModal());
 document.getElementById('cancelBtn').addEventListener('click', closeModal);
+document.getElementById('modalDuplicateBtn').addEventListener('click', () => {
+  const id = editingId;
+  closeModal();
+  if(id) duplicateCard(id);
+});
+document.getElementById('modalDeleteBtn').addEventListener('click', async () => {
+  const id = editingId;
+  if(!id) return;
+  const existedBefore = cards.some(c => c.id === id);
+  await deleteCard(id);
+  const stillExists = cards.some(c => c.id === id);
+  if(existedBefore && !stillExists){
+    closeModal();
+  }
+});
 document.getElementById('saveBtn').addEventListener('click', saveCard);
 document.getElementById('statusHolding').addEventListener('change', toggleSoldFields);
 document.getElementById('statusSold').addEventListener('change', toggleSoldFields);
