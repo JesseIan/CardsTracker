@@ -2748,7 +2748,9 @@ function renderQuickStats(){
   const sold = cards.filter(c => c.status === 'sold');
 
   const valueOf = (c) => c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
-  const mostValuable = cards.reduce((best, c) => valueOf(c) > valueOf(best) ? c : best, cards[0]);
+  const mostValuable = holding.length
+    ? holding.reduce((best, c) => valueOf(c) > valueOf(best) ? c : best, holding[0])
+    : null;
   const avgValue = holding.length ? holding.reduce((s,c) => s + (Number(c.currentValue)||0), 0) / holding.length : 0;
 
   const graderCounts = {};
@@ -2765,7 +2767,7 @@ function renderQuickStats(){
 
   const tiles = [
     { label: 'Total cards', value: String(cards.length), sub: `${holding.length} holding · ${sold.length} sold` },
-    { label: 'Most valuable', value: mostValuable.player || 'Untitled', sub: fmtMoney(valueOf(mostValuable)) },
+    { label: 'Most valuable', value: mostValuable ? (mostValuable.player || 'Untitled') : '—', sub: mostValuable ? fmtMoney(valueOf(mostValuable)) : 'Nothing held' },
     { label: 'Avg. holding value', value: fmtMoney(avgValue), sub: `across ${holding.length} card${holding.length===1?'':'s'}` },
     { label: 'By grader', value: graderSummary.split(' · ')[0] || '—', sub: graderSummary.split(' · ').slice(1).join(' · ') || '\u00A0' },
   ];
