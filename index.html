@@ -551,6 +551,20 @@
     border-radius:10px;
     width:fit-content;
   }
+  .listed-badge{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.4px;
+    color:var(--red-dark);
+    background:rgba(166,61,64,0.1);
+    border:1px solid rgba(166,61,64,0.35);
+    padding:3px 8px;
+    border-radius:10px;
+    width:fit-content;
+  }
+  .listed-badge a{color:inherit;text-decoration:none;}
+  .listed-badge a:hover{text-decoration:underline;}
   .slab-actions{
     display:flex;
     flex-wrap:wrap;
@@ -1000,6 +1014,7 @@
         <option value="sold">Sold</option>
         <option value="stale">Needs price check</option>
         <option value="grading">At grading</option>
+        <option value="listed">Listed for sale</option>
       </select>
       <select id="sortBy">
         <option value="roi_desc">Sort: ROI (high to low)</option>
@@ -1168,6 +1183,25 @@
       <div class="field" id="wrap_gradingDate" style="display:none;">
         <label>Submitted date</label>
         <input type="date" id="f_gradingSubmittedDate">
+      </div>
+
+      <div class="field full">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="f_isListed" style="width:auto;">
+          Currently listed for sale
+        </label>
+      </div>
+      <div class="field" id="wrap_listedPlatform" style="display:none;">
+        <label>Where it's listed</label>
+        <input type="text" id="f_listedPlatform" placeholder="eBay, Facebook Marketplace...">
+      </div>
+      <div class="field" id="wrap_listedPrice" style="display:none;">
+        <label>Asking price ($)</label>
+        <input type="number" id="f_listedPrice" step="0.01" placeholder="250.00">
+      </div>
+      <div class="field full" id="wrap_listedUrl" style="display:none;">
+        <label>Listing link (optional)</label>
+        <input type="text" id="f_listedUrl" placeholder="https://...">
       </div>
       <div class="field">
         <label>Purchase price ($)</label>
@@ -2439,7 +2473,8 @@ function getFilteredSorted(){
     if(tag !== 'all' && !(Array.isArray(c.tags) && c.tags.includes(tag))) return false;
     if(status === 'stale' && !isStale(c)) return false;
     if(status === 'grading' && c.gradingStatus !== 'submitted') return false;
-    if(status !== 'all' && status !== 'stale' && status !== 'grading' && c.status !== status) return false;
+    if(status === 'listed' && c.listedStatus !== 'listed') return false;
+    if(status !== 'all' && status !== 'stale' && status !== 'grading' && status !== 'listed' && c.status !== status) return false;
     if(search){
       const hay = [c.player, c.sport, c.set, c.variant, c.grade, c.certNumber, c.notes, ...(Array.isArray(c.tags)?c.tags:[])].join(' ').toLowerCase();
       if(!hay.includes(search)) return false;
@@ -2551,6 +2586,7 @@ function renderSlab(c){
         ${Array.isArray(c.tags) && c.tags.length ? `<div class="tag-pills">${c.tags.map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         ${isStale(c) ? '<div class="stale-badge">⏱ Needs price check</div>' : ''}
         ${c.gradingStatus === 'submitted' ? `<div class="grading-badge">📦 At ${escapeHtml(c.gradingCompany || 'grader')}${daysSince(c.gradingSubmittedDate) !== null ? ' — ' + daysSince(c.gradingSubmittedDate) + ' days' : ''}</div>` : ''}
+        ${c.listedStatus === 'listed' ? `<div class="listed-badge">${c.listedUrl ? `<a href="${escapeHtml(c.listedUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation();">🔴 Listed${c.listedPlatform ? ' on ' + escapeHtml(c.listedPlatform) : ''}${c.listedPrice ? ' — ' + fmtMoney(c.listedPrice) : ''}</a>` : `🔴 Listed${c.listedPlatform ? ' on ' + escapeHtml(c.listedPlatform) : ''}${c.listedPrice ? ' — ' + fmtMoney(c.listedPrice) : ''}`}</div>` : ''}
         <div class="slab-nums">
           <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
@@ -3090,23 +3126,29 @@ function openModal(id){
     document.getElementById('f_atGrading').checked = c.gradingStatus === 'submitted';
     document.getElementById('f_gradingCompany').value = c.gradingCompany || '';
     document.getElementById('f_gradingSubmittedDate').value = c.gradingSubmittedDate || '';
+    document.getElementById('f_isListed').checked = c.listedStatus === 'listed';
+    document.getElementById('f_listedPlatform').value = c.listedPlatform || '';
+    document.getElementById('f_listedPrice').value = c.listedPrice ?? '';
+    document.getElementById('f_listedUrl').value = c.listedUrl || '';
     modalPhotos = (photos[id] || []).map(p => ({ id: p.id, label: p.label, dataUrl: p.dataUrl, isNew: false, labelChanged: false }));
   }else{
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
     ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_certNumber','f_purchasePrice',
      'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes','f_tags',
-     'f_gradingCompany','f_gradingSubmittedDate'].forEach(id => {
+     'f_gradingCompany','f_gradingSubmittedDate','f_listedPlatform','f_listedPrice','f_listedUrl'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('statusHolding').checked = true;
     document.getElementById('f_atGrading').checked = false;
+    document.getElementById('f_isListed').checked = false;
     modalPhotos = [];
   }
   removedPhotoIds = [];
   document.getElementById('f_photoInput').value = '';
   toggleSoldFields();
   toggleGradingFields();
+  toggleListedFields();
   updateCheckPriceLink();
   renderModalPhotos();
   document.getElementById('modalEditOnlyActions').classList.toggle('hidden', !id);
@@ -3160,6 +3202,13 @@ function toggleGradingFields(){
   }
 }
 
+function toggleListedFields(){
+  const on = document.getElementById('f_isListed').checked;
+  document.getElementById('wrap_listedPlatform').style.display = on ? 'flex' : 'none';
+  document.getElementById('wrap_listedPrice').style.display = on ? 'flex' : 'none';
+  document.getElementById('wrap_listedUrl').style.display = on ? 'flex' : 'none';
+}
+
 async function saveCard(){
   const player = document.getElementById('f_player').value.trim();
   if(!player){
@@ -3188,6 +3237,10 @@ async function saveCard(){
     gradingStatus: document.getElementById('f_atGrading').checked ? 'submitted' : '',
     gradingCompany: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingCompany').value.trim() : '',
     gradingSubmittedDate: document.getElementById('f_atGrading').checked ? document.getElementById('f_gradingSubmittedDate').value : '',
+    listedStatus: document.getElementById('f_isListed').checked ? 'listed' : '',
+    listedPlatform: document.getElementById('f_isListed').checked ? document.getElementById('f_listedPlatform').value.trim() : '',
+    listedPrice: document.getElementById('f_isListed').checked ? (parseFloat(document.getElementById('f_listedPrice').value) || 0) : 0,
+    listedUrl: document.getElementById('f_isListed').checked ? document.getElementById('f_listedUrl').value.trim() : '',
   };
 
   let targetId = editingId;
@@ -3381,6 +3434,7 @@ document.getElementById('saveBtn').addEventListener('click', saveCard);
 document.getElementById('statusHolding').addEventListener('change', toggleSoldFields);
 document.getElementById('statusSold').addEventListener('change', toggleSoldFields);
 document.getElementById('f_atGrading').addEventListener('change', toggleGradingFields);
+document.getElementById('f_isListed').addEventListener('change', toggleListedFields);
 ['f_player','f_year','f_set','f_variant','f_grade'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateCheckPriceLink);
 });
@@ -3965,11 +4019,12 @@ async function saveAvatar(dataUrl){
 }
 
 function exportCsv(){
-  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Cert Number','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date'];
+  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Cert Number','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date','Listed Status','Listed Platform','Listed Price','Listed Url'];
   const rows = cards.map(c => [
     c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.certNumber, c.status,
     c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes,
-    c.gradingStatus, c.gradingCompany, c.gradingSubmittedDate
+    c.gradingStatus, c.gradingCompany, c.gradingSubmittedDate,
+    c.listedStatus, c.listedPlatform, c.listedPrice, c.listedUrl
   ]);
   const csvEscape = (v) => {
     if(v === undefined || v === null) v = '';
@@ -4146,6 +4201,10 @@ function importCsvFile(file){
       gradingStatus: colIndex(['grading status']),
       gradingCompany: colIndex(['grading company']),
       gradingSubmittedDate: colIndex(['grading submitted date']),
+      listedStatus: colIndex(['listed status']),
+      listedPlatform: colIndex(['listed platform']),
+      listedPrice: colIndex(['listed price']),
+      listedUrl: colIndex(['listed url']),
     };
     if(idx.player === -1){
       alert('Could not find a "Player" column in that CSV — make sure it matches the exported format.');
@@ -4190,6 +4249,10 @@ function importCsvFile(file){
         gradingStatus: get(r, 'gradingStatus') === 'submitted' ? 'submitted' : '',
         gradingCompany: get(r, 'gradingCompany'),
         gradingSubmittedDate: normalizeDate(get(r, 'gradingSubmittedDate')),
+        listedStatus: get(r, 'listedStatus') === 'listed' ? 'listed' : '',
+        listedPlatform: get(r, 'listedPlatform'),
+        listedPrice: parseFloat(get(r, 'listedPrice')) || 0,
+        listedUrl: get(r, 'listedUrl'),
         history: [{ date: purchaseDate, value: purchasePrice }]
       };
       if(isSold){
