@@ -1151,7 +1151,7 @@
       <div class="field full">
         <label>Photos (optional) — front, back, flaws, etc.</label>
         <div class="photo-grid" id="photoGrid"></div>
-        <input type="file" id="f_photoInput" accept="image/*" multiple style="display:none;">
+        <input type="file" id="f_photoInput" accept="image/*,.heic,.heif" multiple style="display:none;">
         <div class="icon-btn" id="photoUploadBtn" style="flex:none;display:inline-block;padding:7px 14px;margin-top:8px;">+ Add photo</div>
       </div>
 
@@ -1372,7 +1372,7 @@
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
       <div id="profileAvatarPreview" class="profile-avatar">?</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <input type="file" id="profile_avatarInput" accept="image/*" style="display:none;">
+        <input type="file" id="profile_avatarInput" accept="image/*,.heic,.heif" style="display:none;">
         <div class="icon-btn" id="profileAvatarUploadBtn" style="flex:none;padding:6px 14px;">Change photo</div>
         <div class="icon-btn" id="profileAvatarRemoveBtn" style="flex:none;padding:6px 14px;">Remove</div>
       </div>
@@ -1465,7 +1465,7 @@
     <p class="sub beta-warning">This feature is still rough around the edges — it will sometimes get the name, set, or grade wrong (or leave them blank). Always double-check every field below before saving.</p>
     <p class="sub">Take a photo or upload an image. Works best on a clear, well-lit graded slab label — raw card fronts are hit or miss.</p>
 
-    <input type="file" id="scan_fileInput" accept="image/*" style="display:none;">
+    <input type="file" id="scan_fileInput" accept="image/*,.heic,.heif" style="display:none;">
     <div id="scanChooseBtn" class="icon-btn" style="flex:none;display:inline-block;padding:9px 16px;">📷 Choose or take a photo</div>
 
     <div id="scanCropWrap" class="hidden">
@@ -1637,6 +1637,32 @@ function loadTesseract(){
     document.head.appendChild(script);
   });
   return tesseractLoadPromise;
+}
+
+let heic2anyLoadPromise = null;
+function loadHeic2Any(){
+  if(window.heic2any) return Promise.resolve();
+  if(heic2anyLoadPromise) return heic2anyLoadPromise;
+  heic2anyLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Could not load HEIC support. Check your connection and try again.'));
+    document.head.appendChild(script);
+  });
+  return heic2anyLoadPromise;
+}
+
+function isHeicFile(file){
+  return /\.(heic|heif)$/i.test(file.name || '') || file.type === 'image/heic' || file.type === 'image/heif';
+}
+
+async function ensureBrowserCompatibleImage(file){
+  if(!isHeicFile(file)) return file;
+  await loadHeic2Any();
+  const result = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  const blob = Array.isArray(result) ? result[0] : result;
+  return blob;
 }
 
 function openScanModal(){
@@ -3593,11 +3619,13 @@ document.getElementById('f_photoInput').addEventListener('change', async (e) => 
   const labelCycle = ['Front','Back','Flaw','Other'];
   for(const file of files){
     try{
-      const dataUrl = await resizeImage(file);
+      const compatibleFile = await ensureBrowserCompatibleImage(file);
+      const dataUrl = await resizeImage(compatibleFile);
       const defaultLabel = labelCycle[modalPhotos.length] || 'Other';
       modalPhotos.push({ id: null, label: defaultLabel, dataUrl, isNew: true });
     }catch(err){
       console.error('Photo processing failed', err);
+      alert(`Could not process "${file.name}"${isHeicFile(file) ? ' — HEIC conversion failed, try exporting it as JPEG first' : ''}.`);
     }
   }
   renderModalPhotos();
@@ -3649,8 +3677,9 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
   const file = e.target.files[0];
   if(!file) return;
   try{
-    scanImageFile = file;
-    const previewUrl = await readFileAsDataUrl(file);
+    if(isHeicFile(file)) setScanStatus('Converting HEIC photo...');
+    scanImageFile = await ensureBrowserCompatibleImage(file);
+    const previewUrl = await readFileAsDataUrl(scanImageFile);
     const img = document.getElementById('scanPreviewImg');
     img.onload = () => { initCropBox(); };
     img.src = previewUrl;
@@ -3660,7 +3689,7 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
     setScanStatus('');
   }catch(err){
     console.error('Image read failed', err);
-    setScanStatus('Could not read that image — try a different file.');
+    setScanStatus(isHeicFile(file) ? 'Could not convert this HEIC photo — try exporting it as JPEG first.' : 'Could not read that image — try a different file.');
   }
 });
 document.getElementById('scanBtn').addEventListener('click', runCardScan);
@@ -4553,10 +4582,12 @@ function startApp(){
     const file = e.target.files[0];
     if(!file) return;
     try{
-      pendingAvatarDataUrl = await resizeImage(file);
+      const compatibleFile = await ensureBrowserCompatibleImage(file);
+      pendingAvatarDataUrl = await resizeImage(compatibleFile);
       renderProfileAvatarPreview(fb.auth.currentUser);
     }catch(err){
       console.error('Avatar processing failed', err);
+      alert(`Could not process that photo${isHeicFile(file) ? ' — HEIC conversion failed, try exporting it as JPEG first' : ''}.`);
     }
   });
   document.getElementById('profileAvatarRemoveBtn').addEventListener('click', () => {
