@@ -319,21 +319,6 @@
   .movers-panel{
     margin-top:16px;
   }
-  .movers-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:10px;
-  }
-  .movers-title{
-    font-family:'Oswald',sans-serif;
-    font-weight:500;
-    font-size:14px;
-    text-transform:uppercase;
-    letter-spacing:0.6px;
-    color:var(--ink-soft);
-  }
-  #moversSortBy{font-size:12px;padding:5px 8px;}
   .movers-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -349,6 +334,14 @@
     font-family:'Oswald',sans-serif;font-weight:500;font-size:13px;margin:0 0 10px;
     text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);
   }
+  .mover-col-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .mover-col-head h3{margin:0;}
+  #moversSortBy{font-size:11px;padding:4px 6px;}
   .mover-row{
     display:grid;
     grid-template-columns:1fr auto auto;
@@ -1030,16 +1023,15 @@
   </div>
 
   <div class="movers-panel hidden" id="topMoversPanel">
-    <div class="movers-header">
-      <span class="movers-title">Top movers</span>
-      <select id="moversSortBy">
-        <option value="pct">Rank by %</option>
-        <option value="dollar">Rank by $</option>
-      </select>
-    </div>
     <div class="movers-grid">
       <div class="mover-col">
-        <h3>Top gainers</h3>
+        <div class="mover-col-head">
+          <h3>Top gainers</h3>
+          <select id="moversSortBy">
+            <option value="pct">Rank by %</option>
+            <option value="dollar">Rank by $</option>
+          </select>
+        </div>
         <div id="topGainersList"></div>
       </div>
       <div class="mover-col">
