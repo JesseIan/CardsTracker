@@ -2376,12 +2376,11 @@ function cardEffectiveValue(c){
 }
 
 // Used for "what is my collection currently worth" totals — unlike cardEffectiveValue,
-// this excludes traded-away cards entirely. A trade converts a card's value into either
-// cash (not tracked here) or a new card (which gets counted separately when added), so
-// including it here would double-count it. Sold cards still count since that cash is a
-// realized, standalone amount with nothing else representing it.
+// this only counts cards you're still holding. Sold proceeds and traded value both
+// represent things that have left the collection (cash spent/banked elsewhere, or a
+// replacement card that gets counted separately when added), so neither belongs here.
 function cardPortfolioValue(c){
-  if(c.status === 'traded') return 0;
+  if(isRealized(c)) return 0;
   return cardEffectiveValue(c);
 }
 
