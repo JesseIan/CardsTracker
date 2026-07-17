@@ -2375,6 +2375,16 @@ function cardEffectiveValue(c){
   return Number(c.currentValue)||0;
 }
 
+// Used for "what is my collection currently worth" totals — unlike cardEffectiveValue,
+// this excludes traded-away cards entirely. A trade converts a card's value into either
+// cash (not tracked here) or a new card (which gets counted separately when added), so
+// including it here would double-count it. Sold cards still count since that cash is a
+// realized, standalone amount with nothing else representing it.
+function cardPortfolioValue(c){
+  if(c.status === 'traded') return 0;
+  return cardEffectiveValue(c);
+}
+
 function isRealized(c){
   return c.status === 'sold' || c.status === 'traded';
 }
@@ -2396,7 +2406,7 @@ function getCardTimeline(c){
 
 function renderSummary(){
   const invested = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
-  const value = cards.reduce((s,c)=> s + cardEffectiveValue(c), 0);
+  const value = cards.reduce((s,c)=> s + cardPortfolioValue(c), 0);
 
   const holding = cards.filter(c => !isRealized(c));
   const realizedCards = cards.filter(isRealized);
@@ -2762,7 +2772,7 @@ function duplicateCard(id){
 
 function openPrintView(){
   const list = getFilteredSorted();
-  const totalValue = list.reduce((s,c) => s + cardEffectiveValue(c), 0);
+  const totalValue = list.reduce((s,c) => s + cardPortfolioValue(c), 0);
 
   const rows = list.map(c => {
     const cover = (photos[c.id] || [])[0];
@@ -3870,8 +3880,9 @@ async function openShareStatsModal(){
   ctx.fillText('PORTFOLIO SNAPSHOT', 62, 155);
 
   const invested = cards.reduce((s,c)=>s+(Number(c.purchasePrice)||0),0);
-  const value = cards.reduce((s,c)=>s+cardEffectiveValue(c),0);
-  const gain = value - invested;
+  const value = cards.reduce((s,c)=>s+cardPortfolioValue(c),0);
+  const trueValue = cards.reduce((s,c)=>s+cardEffectiveValue(c),0);
+  const gain = trueValue - invested;
   const gainPct = invested ? (gain/invested*100) : 0;
 
   ctx.fillStyle = '#3C4566';
@@ -4030,7 +4041,7 @@ async function saveMilestone(){
 
 function checkValueMilestones(){
   if(cards.length === 0) return;
-  const value = cards.reduce((s,c) => s + cardEffectiveValue(c), 0);
+  const value = cards.reduce((s,c) => s + cardPortfolioValue(c), 0);
   const crossed = VALUE_MILESTONES.filter(m => value >= m && m > highestMilestoneCelebrated);
   if(crossed.length > 0){
     const newHigh = Math.max(...crossed);
