@@ -1029,7 +1029,7 @@
           <h3>Top gainers</h3>
           <select id="moversSortBy">
             <option value="pct">Rank by %</option>
-            <option value="dollar">Rank by $</option>
+            <option value="dollar" selected>Rank by $</option>
           </select>
         </div>
         <div id="topGainersList"></div>
@@ -4782,8 +4782,8 @@ function startApp(){
       document.getElementById('appWrap').classList.remove('hidden');
       document.getElementById('auth_password').value = '';
       clearAuthError();
-      updateWelcomeText(user);
       await loadData();
+      updateWelcomeText(user);
       renderAll();
     }else{
       currentUid = null;
