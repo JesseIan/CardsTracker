@@ -2204,7 +2204,10 @@ async function loadData(){
     highestMilestoneCelebrated = Number(data.highestMilestoneCelebrated) || 0;
     userAvatarDataUrl = data.avatarDataUrl || null;
     let anyRepaired = false;
-    cards.forEach(c => { if(repairCardDates(c)) anyRepaired = true; });
+    cards.forEach(c => {
+      if(repairCardDates(c)) anyRepaired = true;
+      if(repairCardStatusFields(c)) anyRepaired = true;
+    });
     if(anyRepaired) await saveData();
   }catch(e){
     console.error('Load error', e);
@@ -2262,6 +2265,25 @@ function repairCardDates(card){
       map[n] = h.value;
     });
     card.history = Object.keys(map).sort().map(d => ({ date: d, value: map[d] }));
+  }
+  return changed;
+}
+
+function repairCardStatusFields(card){
+  let changed = false;
+  const status = card.status || 'holding';
+  if(status !== 'holding' && Number(card.currentValue) !== 0){
+    card.currentValue = 0;
+    changed = true;
+  }
+  if(status !== 'sold'){
+    if(Number(card.soldPrice) !== 0){ card.soldPrice = 0; changed = true; }
+    if(card.soldDate){ card.soldDate = ''; changed = true; }
+  }
+  if(status !== 'traded'){
+    if(Number(card.tradedValue) !== 0){ card.tradedValue = 0; changed = true; }
+    if(card.tradedDate){ card.tradedDate = ''; changed = true; }
+    if(card.tradedFor){ card.tradedFor = ''; changed = true; }
   }
   return changed;
 }
