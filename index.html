@@ -317,10 +317,27 @@
   }
 
   .movers-panel{
+    margin-top:16px;
+  }
+  .movers-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .movers-title{
+    font-family:'Oswald',sans-serif;
+    font-weight:500;
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--ink-soft);
+  }
+  #moversSortBy{font-size:12px;padding:5px 8px;}
+  .movers-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:16px;
-    margin-top:16px;
   }
   .mover-col{
     background:var(--paper);
@@ -340,7 +357,11 @@
     padding:6px 0;
     border-top:1px solid var(--line);
     font-size:13px;
+    cursor:pointer;
+    border-radius:4px;
+    transition:background 0.15s;
   }
+  .mover-row:hover{background:rgba(28,37,65,0.05);}
   .mover-row:first-child{border-top:none;}
   .mover-name{font-family:'Inter',sans-serif;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mover-roi{font-family:'IBM Plex Mono',monospace;font-weight:600;min-width:58px;text-align:right;}
@@ -350,7 +371,7 @@
   .mover-empty{font-size:12px;color:var(--ink-soft);font-style:italic;padding:6px 0;}
 
   @media (max-width:800px){
-    .movers-panel{grid-template-columns:1fr;}
+    .movers-grid{grid-template-columns:1fr;}
   }
 
   /* ---------- controls ---------- */
@@ -1009,13 +1030,22 @@
   </div>
 
   <div class="movers-panel hidden" id="topMoversPanel">
-    <div class="mover-col">
-      <h3>Top gainers</h3>
-      <div id="topGainersList"></div>
+    <div class="movers-header">
+      <span class="movers-title">Top movers</span>
+      <select id="moversSortBy">
+        <option value="pct">Rank by %</option>
+        <option value="dollar">Rank by $</option>
+      </select>
     </div>
-    <div class="mover-col">
-      <h3>Top losers</h3>
-      <div id="topLosersList"></div>
+    <div class="movers-grid">
+      <div class="mover-col">
+        <h3>Top gainers</h3>
+        <div id="topGainersList"></div>
+      </div>
+      <div class="mover-col">
+        <h3>Top losers</h3>
+        <div id="topLosersList"></div>
+      </div>
     </div>
   </div>
 
@@ -3027,14 +3057,17 @@ function renderTopMovers(){
   }
   panel.classList.remove('hidden');
 
+  const sortMode = document.getElementById('moversSortBy').value;
+  const rankKey = sortMode === 'dollar' ? 'gain' : 'roi';
+
   const withRoi = cards.map(c => ({ c, roi: cardRoi(c), gain: cardGainDollar(c) }));
-  const gainers = [...withRoi].filter(x => x.roi > 0).sort((a,b) => b.roi - a.roi).slice(0,3);
-  const losers = [...withRoi].filter(x => x.roi < 0).sort((a,b) => a.roi - b.roi).slice(0,3);
+  const gainers = [...withRoi].filter(x => x.roi > 0).sort((a,b) => b[rankKey] - a[rankKey]).slice(0,3);
+  const losers = [...withRoi].filter(x => x.roi < 0).sort((a,b) => a[rankKey] - b[rankKey]).slice(0,3);
 
   const renderList = (items, emptyMsg) => {
     if(items.length === 0) return `<div class="mover-empty">${emptyMsg}</div>`;
     return items.map(({c, roi, gain}) => `
-      <div class="mover-row">
+      <div class="mover-row" onclick="openModal('${c.id}')">
         <span class="mover-name">${escapeHtml(c.player || 'Untitled')}</span>
         <span class="mover-roi ${roi >= 0 ? 'pos' : 'neg'}">${fmtPct(roi)}</span>
         <span class="mover-gain">${(gain>=0?'+':'') + fmtMoney(gain)}</span>
@@ -3635,6 +3668,7 @@ document.getElementById('f_isAwaitingDelivery').addEventListener('change', toggl
 document.getElementById('filterSport').addEventListener('change', renderGrid);
 document.getElementById('filterTag').addEventListener('change', renderGrid);
 document.getElementById('groupBy').addEventListener('change', renderGrid);
+document.getElementById('moversSortBy').addEventListener('change', renderTopMovers);
 
 document.getElementById('gridArea').addEventListener('mousemove', (e) => {
   const photoEl = e.target.closest('.slab-photo');
