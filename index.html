@@ -1068,7 +1068,7 @@
     <div style="display:flex;gap:8px;">
       <button class="btn secondary" id="bulkMarkSoldBtn">Mark as sold</button>
       <button class="btn danger" id="bulkDeleteBtn">Delete</button>
-      <button class="btn secondary" id="bulkCancelBtn">Cancel</button>
+      <button class="btn secondary" id="selectionCancelBtn">Cancel</button>
     </div>
   </div>
 
@@ -1659,13 +1659,33 @@ function isHeicFile(file){
 
 async function ensureBrowserCompatibleImage(file){
   if(!isHeicFile(file)) return file;
+
+  // Some browsers (notably Safari) can decode HEIC natively. Try that first —
+  // it's faster and sidesteps any issues with the fallback decoder library.
+  try{
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    const nativeBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if(nativeBlob) return nativeBlob;
+  }catch(e){
+    // Native decode not supported here — fall through to the WASM decoder below.
+  }
+
   await loadHeic2Any();
   if(typeof window.heic2any !== 'function'){
     throw new Error('HEIC support library did not load correctly.');
   }
-  const result = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-  const blob = Array.isArray(result) ? result[0] : result;
-  return blob;
+  try{
+    const result = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+    const blob = Array.isArray(result) ? result[0] : result;
+    return blob;
+  }catch(e){
+    console.error('heic2any conversion error:', e);
+    throw new Error((e && e.message) ? e.message : 'HEIC conversion failed');
+  }
 }
 
 function openScanModal(){
@@ -3579,9 +3599,8 @@ document.getElementById('f_isAwaitingDelivery').addEventListener('change', toggl
 ['f_player','f_year','f_set','f_variant','f_grade'].forEach(id => {
   document.getElementById(id).addEventListener('input', updateCheckPriceLink);
 });
-document.getElementById('modalOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'modalOverlay') closeModal();
-});
+// Clicking outside this modal no longer closes it — it holds too much typed
+// data to risk losing on a stray click. Use Cancel or Save instead.
 document.getElementById('filterSport').addEventListener('change', renderGrid);
 document.getElementById('filterTag').addEventListener('change', renderGrid);
 document.getElementById('groupBy').addEventListener('change', renderGrid);
@@ -3628,7 +3647,7 @@ document.getElementById('f_photoInput').addEventListener('change', async (e) => 
       modalPhotos.push({ id: null, label: defaultLabel, dataUrl, isNew: true });
     }catch(err){
       console.error('Photo processing failed', err);
-      alert(`Could not process "${file.name}"${isHeicFile(file) ? ' — HEIC conversion failed, try exporting it as JPEG first' : ''}.`);
+      alert(`Could not process "${file.name}"${isHeicFile(file) ? ' — HEIC conversion failed (' + (err.message || 'unknown error') + '). Try exporting it as JPEG first.' : ''}.`);
     }
   }
   renderModalPhotos();
@@ -3659,7 +3678,7 @@ document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
 
 document.getElementById('printViewBtn').addEventListener('click', openPrintView);
 document.getElementById('selectModeBtn').addEventListener('click', toggleSelectMode);
-document.getElementById('bulkCancelBtn').addEventListener('click', exitSelectMode);
+document.getElementById('selectionCancelBtn').addEventListener('click', exitSelectMode);
 document.getElementById('bulkDeleteBtn').addEventListener('click', bulkDeleteSelected);
 document.getElementById('bulkMarkSoldBtn').addEventListener('click', openBulkSoldModal);
 document.getElementById('bulkSoldCancelBtn').addEventListener('click', closeBulkSoldModal);
@@ -3692,7 +3711,7 @@ document.getElementById('scan_fileInput').addEventListener('change', async (e) =
     setScanStatus('');
   }catch(err){
     console.error('Image read failed', err);
-    setScanStatus(isHeicFile(file) ? 'Could not convert this HEIC photo — try exporting it as JPEG first.' : 'Could not read that image — try a different file.');
+    setScanStatus(isHeicFile(file) ? `Could not convert this HEIC photo (${err.message || 'unknown error'}). Try exporting it as JPEG first.` : 'Could not read that image — try a different file.');
   }
 });
 document.getElementById('scanBtn').addEventListener('click', runCardScan);
@@ -3713,17 +3732,14 @@ document.getElementById('watchModalRemoveBtn').addEventListener('click', async (
   }
 });
 document.getElementById('watchSaveBtn').addEventListener('click', saveWatchItem);
-document.getElementById('watchModalOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'watchModalOverlay') closeWatchModal();
-});
+// Clicking outside this modal no longer closes it, to avoid losing typed data.
 document.getElementById('watchSearchInput').addEventListener('input', renderWatchlist);
 document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
 document.getElementById('bulkSaveBtn').addEventListener('click', saveBulkCards);
 document.getElementById('bulkAddRowBtn').addEventListener('click', addBulkRow);
 document.getElementById('bulkClearBtn').addEventListener('click', resetBulkGrid);
-document.getElementById('bulkModalOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'bulkModalOverlay') closeBulkModal();
-});
+// Clicking outside this modal no longer closes it — losing a filled-in
+// spreadsheet grid to a stray click would be painful. Use Cancel instead.
 document.getElementById('bulkTableBody').addEventListener('paste', handleBulkPaste);
 
 async function openShareCardModal(id){
@@ -4590,7 +4606,7 @@ function startApp(){
       renderProfileAvatarPreview(fb.auth.currentUser);
     }catch(err){
       console.error('Avatar processing failed', err);
-      alert(`Could not process that photo${isHeicFile(file) ? ' — HEIC conversion failed, try exporting it as JPEG first' : ''}.`);
+      alert(`Could not process that photo${isHeicFile(file) ? ' — HEIC conversion failed (' + (err.message || 'unknown error') + '). Try exporting it as JPEG first.' : ''}.`);
     }
   });
   document.getElementById('profileAvatarRemoveBtn').addEventListener('click', () => {
