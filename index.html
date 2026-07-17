@@ -466,6 +466,7 @@
     position:relative;
   }
   .slab.sold{opacity:0.72;}
+  .slab.traded{opacity:0.72;}
   .slab-photo{
     width:100%;
     height:190px;
@@ -655,6 +656,7 @@
     box-shadow:0 1px 3px rgba(0,0,0,0.3);
     z-index:2;
   }
+  .sold-flag.traded-flag{background:var(--gold);color:#3A2B0A;}
 
   /* ---------- modal ---------- */
   .modal-overlay{
@@ -1026,6 +1028,7 @@
         <option value="all">All cards</option>
         <option value="holding">Holding</option>
         <option value="sold">Sold</option>
+        <option value="traded">Traded</option>
         <option value="stale">Needs price check</option>
         <option value="grading">At grading</option>
         <option value="listed">Listed for sale</option>
@@ -1250,6 +1253,7 @@
         <div class="status-toggle">
           <label><input type="radio" name="status" value="holding" id="statusHolding" checked> Still holding</label>
           <label><input type="radio" name="status" value="sold" id="statusSold"> Sold</label>
+          <label><input type="radio" name="status" value="traded" id="statusTraded"> Traded</label>
         </div>
       </div>
 
@@ -1264,6 +1268,18 @@
       <div class="field" id="wrap_soldDate" style="display:none;">
         <label>Sold date</label>
         <input type="date" id="f_soldDate">
+      </div>
+      <div class="field" id="wrap_tradedDate" style="display:none;">
+        <label>Traded date</label>
+        <input type="date" id="f_tradedDate">
+      </div>
+      <div class="field" id="wrap_tradedValue" style="display:none;">
+        <label>Value received (estimate, $)</label>
+        <input type="number" id="f_tradedValue" step="0.01" placeholder="What you got was worth">
+      </div>
+      <div class="field full" id="wrap_tradedFor" style="display:none;">
+        <label>Traded for</label>
+        <input type="text" id="f_tradedFor" placeholder="e.g. 2 base cards + $20 cash, or another player's card">
       </div>
       <div class="field full">
         <a href="#" id="checkPriceLink" class="price-check-link" onclick="return false;">🔍 Check recent sold prices on eBay ↗</a>
@@ -2249,6 +2265,11 @@ function cardRoi(c){
     const got = Number(c.soldPrice) || 0;
     if(paid === 0) return 0;
     return ((got - paid) / paid) * 100;
+  }else if(c.status === 'traded'){
+    const paid = Number(c.purchasePrice) || 0;
+    const got = Number(c.tradedValue) || 0;
+    if(paid === 0) return 0;
+    return ((got - paid) / paid) * 100;
   }else{
     const paid = Number(c.purchasePrice) || 0;
     const now = Number(c.currentValue) || 0;
@@ -2260,6 +2281,9 @@ function cardRoi(c){
 function cardGainDollar(c){
   if(c.status === 'sold'){
     return (Number(c.soldPrice)||0) - (Number(c.purchasePrice)||0);
+  }
+  if(c.status === 'traded'){
+    return (Number(c.tradedValue)||0) - (Number(c.purchasePrice)||0);
   }
   return (Number(c.currentValue)||0) - (Number(c.purchasePrice)||0);
 }
@@ -2274,13 +2298,23 @@ function pushHistoryPoint(c, date, value){
   c.history.sort((a,b) => a.date.localeCompare(b.date));
 }
 
+function cardEffectiveValue(c){
+  if(c.status === 'sold') return Number(c.soldPrice)||0;
+  if(c.status === 'traded') return Number(c.tradedValue)||0;
+  return Number(c.currentValue)||0;
+}
+
+function isRealized(c){
+  return c.status === 'sold' || c.status === 'traded';
+}
+
 function getCardTimeline(c){
   const hist = Array.isArray(c.history) ? c.history.slice() : [];
   if(hist.length === 0){
     hist.push({ date: c.purchaseDate || todayIso(), value: Number(c.purchasePrice)||0 });
   }
-  const liveDate = c.status === 'sold' ? (c.soldDate || todayIso()) : todayIso();
-  const liveValue = c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+  const liveDate = c.status === 'sold' ? (c.soldDate || todayIso()) : c.status === 'traded' ? (c.tradedDate || todayIso()) : todayIso();
+  const liveValue = cardEffectiveValue(c);
   const last = hist[hist.length - 1];
   if(!last || last.date !== liveDate || last.value !== liveValue){
     hist.push({ date: liveDate, value: liveValue });
@@ -2291,14 +2325,14 @@ function getCardTimeline(c){
 
 function renderSummary(){
   const invested = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
-  const value = cards.reduce((s,c)=> s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+  const value = cards.reduce((s,c)=> s + cardEffectiveValue(c), 0);
 
-  const holding = cards.filter(c => c.status !== 'sold');
-  const sold = cards.filter(c => c.status === 'sold');
+  const holding = cards.filter(c => !isRealized(c));
+  const realizedCards = cards.filter(isRealized);
   const holdingInvested = holding.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
   const holdingValue = holding.reduce((s,c)=> s + (Number(c.currentValue)||0), 0);
-  const soldInvested = sold.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
-  const soldValue = sold.reduce((s,c)=> s + (Number(c.soldPrice)||0), 0);
+  const soldInvested = realizedCards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const soldValue = realizedCards.reduce((s,c)=> s + cardEffectiveValue(c), 0);
   const unrealized = holdingValue - holdingInvested;
   const unrealizedPct = holdingInvested === 0 ? 0 : (unrealized / holdingInvested) * 100;
   const realized = soldValue - soldInvested;
@@ -2488,7 +2522,7 @@ function daysSince(dateStr){
 }
 
 function isStale(c){
-  if(c.status === 'sold') return false;
+  if(isRealized(c)) return false;
   const hist = Array.isArray(c.history) && c.history.length ? c.history : null;
   const lastDate = hist ? hist[hist.length-1].date : c.purchaseDate;
   const days = daysSince(lastDate);
@@ -2521,9 +2555,7 @@ function getFilteredSorted(){
     if(sortBy === 'roi_desc') return cardRoi(b) - cardRoi(a);
     if(sortBy === 'roi_asc') return cardRoi(a) - cardRoi(b);
     if(sortBy === 'value_desc'){
-      const va = a.status === 'sold' ? Number(a.soldPrice)||0 : Number(a.currentValue)||0;
-      const vb = b.status === 'sold' ? Number(b.soldPrice)||0 : Number(b.currentValue)||0;
-      return vb - va;
+      return cardEffectiveValue(b) - cardEffectiveValue(a);
     }
     if(sortBy === 'date_desc') return (b.createdAt||0) - (a.createdAt||0);
     if(sortBy === 'date_asc') return (a.createdAt||0) - (b.createdAt||0);
@@ -2592,17 +2624,19 @@ function renderSlab(c){
   const gain = cardGainDollar(c);
   const roiClass = roi > 0 ? 'pos' : roi < 0 ? 'neg' : 'zero';
   const isSold = c.status === 'sold';
-  const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
-  const valueLabel = isSold ? 'Sold for' : 'Current value';
+  const isTraded = c.status === 'traded';
+  const displayValue = cardEffectiveValue(c);
+  const valueLabel = isSold ? 'Sold for' : isTraded ? 'Traded for' : 'Current value';
   const cardPhotos = photos[c.id] || [];
   let coverIndex = cardPhotos.findIndex(p => p.label === 'Front');
   if(coverIndex === -1) coverIndex = 0;
   const cover = cardPhotos[coverIndex];
 
   return `
-    <div class="slab ${isSold ? 'sold' : ''}">
+    <div class="slab ${isSold ? 'sold' : ''} ${isTraded ? 'traded' : ''}">
       ${selectMode ? `<input type="checkbox" class="slab-select-box" onclick="event.stopPropagation(); toggleCardSelection('${c.id}')" ${selectedIds.has(c.id) ? 'checked' : ''}>` : ''}
       ${isSold ? '<div class="sold-flag">SOLD</div>' : ''}
+      ${isTraded ? '<div class="sold-flag traded-flag">TRADED</div>' : ''}
       <div class="slab-photo" ${cover ? `onclick="openLightbox('${c.id}', ${coverIndex})"` : ''}>
         ${cover ? `<img src="${cover.dataUrl}" alt="${escapeHtml(c.player||'card')}">` : '<span class="ph-placeholder">No photo</span>'}
         ${cover ? '<div class="holo-shine"></div>' : ''}
@@ -2627,9 +2661,10 @@ function renderSlab(c){
           <div><span class="num-label">Paid</span><span class="num-value">${fmtMoney(c.purchasePrice)}</span></div>
           <div><span class="num-label">${valueLabel}</span><span class="num-value">${fmtMoney(displayValue)}</span></div>
           <div><span class="num-label">Gain / loss</span><span class="num-value">${(gain>=0?'+':'') + fmtMoney(gain)}</span></div>
-          <div><span class="num-label">${isSold ? 'Sold' : 'Purchased'}</span><span class="num-value">${escapeHtml((isSold ? c.soldDate : c.purchaseDate) || '—')}</span></div>
+          <div><span class="num-label">${isSold ? 'Sold' : isTraded ? 'Traded' : 'Purchased'}</span><span class="num-value">${escapeHtml((isSold ? c.soldDate : isTraded ? c.tradedDate : c.purchaseDate) || '—')}</span></div>
           ${c.certNumber ? `<div><span class="num-label">Cert #</span><span class="num-value">${escapeHtml(c.certNumber)}</span></div>` : ''}
         </div>
+        ${c.status === 'traded' && c.tradedFor ? `<div class="slab-notes">Traded for: ${escapeHtml(c.tradedFor)}</div>` : ''}
         ${c.notes ? `<div class="slab-notes">${escapeHtml(c.notes)}</div>` : ''}
       </div>
       <div class="slab-actions">
@@ -2656,12 +2691,13 @@ function duplicateCard(id){
 
 function openPrintView(){
   const list = getFilteredSorted();
-  const totalValue = list.reduce((s,c) => s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+  const totalValue = list.reduce((s,c) => s + cardEffectiveValue(c), 0);
 
   const rows = list.map(c => {
     const cover = (photos[c.id] || [])[0];
-    const value = c.status === 'sold' ? c.soldPrice : c.currentValue;
+    const value = cardEffectiveValue(c);
     const cardDesc = [c.year, c.set, c.number ? '#'+c.number : '', c.variant].filter(Boolean).join(' ');
+    const statusLabel = c.status === 'sold' ? 'Sold' : c.status === 'traded' ? 'Traded' : 'Holding';
     return `<tr>
       <td>${cover ? `<img src="${cover.dataUrl}" style="width:46px;height:64px;object-fit:cover;border-radius:3px;">` : ''}</td>
       <td>${escapeHtml(c.player||'')}</td>
@@ -2669,7 +2705,7 @@ function openPrintView(){
       <td>${escapeHtml(c.grade || 'Raw')}</td>
       <td>${fmtMoney(c.purchasePrice)}</td>
       <td>${fmtMoney(value)}</td>
-      <td>${c.status === 'sold' ? 'Sold' : 'Holding'}</td>
+      <td>${statusLabel}</td>
     </tr>`;
   }).join('');
 
@@ -2816,10 +2852,10 @@ function renderQuickStats(){
   const el = document.getElementById('quickStats');
   if(cards.length === 0){ el.innerHTML = ''; return; }
 
-  const holding = cards.filter(c => c.status !== 'sold');
-  const sold = cards.filter(c => c.status === 'sold');
+  const holding = cards.filter(c => !isRealized(c));
+  const sold = cards.filter(isRealized);
 
-  const valueOf = (c) => c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+  const valueOf = cardEffectiveValue;
   const mostValuable = holding.length
     ? holding.reduce((best, c) => valueOf(c) > valueOf(best) ? c : best, holding[0])
     : null;
@@ -2838,7 +2874,7 @@ function renderQuickStats(){
   const graderSummary = Object.entries(graderCounts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: ${v}`).join(' · ');
 
   const tiles = [
-    { label: 'Total cards', value: String(cards.length), sub: `${holding.length} holding · ${sold.length} sold` },
+    { label: 'Total cards', value: String(cards.length), sub: `${holding.length} holding · ${sold.length} sold/traded` },
     { label: 'Most valuable', value: mostValuable ? (mostValuable.player || 'Untitled') : '—', sub: mostValuable ? fmtMoney(valueOf(mostValuable)) : 'Nothing held' },
     { label: 'Avg. holding value', value: fmtMoney(avgValue), sub: `across ${holding.length} card${holding.length===1?'':'s'}` },
     { label: 'By grader', value: graderSummary.split(' · ')[0] || '—', sub: graderSummary.split(' · ').slice(1).join(' · ') || '\u00A0' },
@@ -2856,7 +2892,7 @@ function renderQuickStats(){
 function renderBreakdownChart(){
   const ctx = document.getElementById('breakdownChart');
   const mode = document.getElementById('breakdownFilter').value;
-  const holding = cards.filter(c => c.status !== 'sold');
+  const holding = cards.filter(c => !isRealized(c));
 
   if(holding.length === 0){
     if(breakdownChartInstance){ breakdownChartInstance.destroy(); breakdownChartInstance = null; }
@@ -3155,10 +3191,14 @@ function openModal(id){
     document.getElementById('f_currentValue').value = c.currentValue ?? '';
     document.getElementById('f_soldPrice').value = c.soldPrice ?? '';
     document.getElementById('f_soldDate').value = c.soldDate || '';
+    document.getElementById('f_tradedDate').value = c.tradedDate || '';
+    document.getElementById('f_tradedValue').value = c.tradedValue ?? '';
+    document.getElementById('f_tradedFor').value = c.tradedFor || '';
     document.getElementById('f_notes').value = c.notes || '';
     document.getElementById('f_tags').value = Array.isArray(c.tags) ? c.tags.join(', ') : '';
-    document.getElementById('statusHolding').checked = c.status !== 'sold';
+    document.getElementById('statusHolding').checked = c.status === 'holding' || !c.status;
     document.getElementById('statusSold').checked = c.status === 'sold';
+    document.getElementById('statusTraded').checked = c.status === 'traded';
     document.getElementById('f_atGrading').checked = c.gradingStatus === 'submitted';
     document.getElementById('f_gradingCompany').value = c.gradingCompany || '';
     document.getElementById('f_gradingSubmittedDate').value = c.gradingSubmittedDate || '';
@@ -3175,12 +3215,14 @@ function openModal(id){
     title.textContent = 'Add a card';
     sub.textContent = "Enter what you paid and what it's worth now.";
     ['f_player','f_sport','f_year','f_set','f_number','f_variant','f_grade','f_certNumber','f_purchasePrice',
-     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_notes','f_tags',
+     'f_purchaseDate','f_currentValue','f_soldPrice','f_soldDate','f_tradedDate','f_tradedValue','f_tradedFor','f_notes','f_tags',
      'f_gradingCompany','f_gradingSubmittedDate','f_listedPlatform','f_listedPrice','f_listedUrl',
      'f_shipSource','f_shipExpected','f_shipTracking'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('statusHolding').checked = true;
+    document.getElementById('statusSold').checked = false;
+    document.getElementById('statusTraded').checked = false;
     document.getElementById('f_atGrading').checked = false;
     document.getElementById('f_isListed').checked = false;
     document.getElementById('f_isAwaitingDelivery').checked = false;
@@ -3208,9 +3250,13 @@ function closeModal(){
 
 function toggleSoldFields(){
   const sold = document.getElementById('statusSold').checked;
-  document.getElementById('wrap_currentValue').style.display = sold ? 'none' : 'flex';
+  const traded = document.getElementById('statusTraded').checked;
+  document.getElementById('wrap_currentValue').style.display = (sold || traded) ? 'none' : 'flex';
   document.getElementById('wrap_soldPrice').style.display = sold ? 'flex' : 'none';
   document.getElementById('wrap_soldDate').style.display = sold ? 'flex' : 'none';
+  document.getElementById('wrap_tradedDate').style.display = traded ? 'flex' : 'none';
+  document.getElementById('wrap_tradedValue').style.display = traded ? 'flex' : 'none';
+  document.getElementById('wrap_tradedFor').style.display = traded ? 'flex' : 'none';
 }
 
 function buildEbaySearchUrl(player, year, set, variant, grade){
@@ -3265,7 +3311,9 @@ async function saveCard(){
     document.getElementById('f_player').focus();
     return;
   }
-  const status = document.getElementById('statusSold').checked ? 'sold' : 'holding';
+  const status = document.getElementById('statusSold').checked ? 'sold'
+    : document.getElementById('statusTraded').checked ? 'traded'
+    : 'holding';
 
   const data = {
     player,
@@ -3282,6 +3330,9 @@ async function saveCard(){
     currentValue: parseFloat(document.getElementById('f_currentValue').value) || 0,
     soldPrice: parseFloat(document.getElementById('f_soldPrice').value) || 0,
     soldDate: document.getElementById('f_soldDate').value,
+    tradedDate: document.getElementById('f_tradedDate').value,
+    tradedValue: parseFloat(document.getElementById('f_tradedValue').value) || 0,
+    tradedFor: document.getElementById('f_tradedFor').value.trim(),
     notes: document.getElementById('f_notes').value.trim(),
     tags: document.getElementById('f_tags').value.split(',').map(t => t.trim()).filter(Boolean),
     gradingStatus: document.getElementById('f_atGrading').checked ? 'submitted' : '',
@@ -3324,6 +3375,9 @@ async function saveCard(){
       if(merged.status === 'sold' && (old.soldPrice !== merged.soldPrice || old.soldDate !== merged.soldDate || old.status !== 'sold')){
         pushHistoryPoint(merged, merged.soldDate || todayIso(), merged.soldPrice);
       }
+      if(merged.status === 'traded' && (old.tradedValue !== merged.tradedValue || old.tradedDate !== merged.tradedDate || old.status !== 'traded')){
+        pushHistoryPoint(merged, merged.tradedDate || todayIso(), merged.tradedValue);
+      }
       cards[idx] = merged;
     }
   }else{
@@ -3336,6 +3390,8 @@ async function saveCard(){
     };
     if(newCard.status === 'sold'){
       pushHistoryPoint(newCard, newCard.soldDate || todayIso(), newCard.soldPrice);
+    }else if(newCard.status === 'traded'){
+      pushHistoryPoint(newCard, newCard.tradedDate || todayIso(), newCard.tradedValue);
     }else{
       // Always record today as the "last updated" point, even if current value equals
       // purchase price — otherwise a card with an older purchase date would show as
@@ -3487,6 +3543,7 @@ document.getElementById('modalDeleteBtn').addEventListener('click', async () => 
 document.getElementById('saveBtn').addEventListener('click', saveCard);
 document.getElementById('statusHolding').addEventListener('change', toggleSoldFields);
 document.getElementById('statusSold').addEventListener('change', toggleSoldFields);
+document.getElementById('statusTraded').addEventListener('change', toggleSoldFields);
 document.getElementById('f_atGrading').addEventListener('change', toggleGradingFields);
 document.getElementById('f_isListed').addEventListener('change', toggleListedFields);
 document.getElementById('f_isAwaitingDelivery').addEventListener('change', toggleShippingFields);
@@ -3660,7 +3717,8 @@ async function openShareCardModal(id){
   const cover = (photos[c.id] || [])[0];
   const drawRest = () => {
     const isSold = c.status === 'sold';
-    const displayValue = isSold ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+    const isTraded = c.status === 'traded';
+    const displayValue = cardEffectiveValue(c);
     const roi = cardRoi(c);
     const gain = cardGainDollar(c);
 
@@ -3681,7 +3739,7 @@ async function openShareCardModal(id){
 
     const cols = [
       ['PAID', fmtMoney(c.purchasePrice)],
-      [isSold ? 'SOLD FOR' : 'CURRENT VALUE', fmtMoney(displayValue)],
+      [isSold ? 'SOLD FOR' : isTraded ? 'TRADED FOR' : 'CURRENT VALUE', fmtMoney(displayValue)],
       ['ROI', (roi>=0?'+':'')+roi.toFixed(1)+'%'],
     ];
     const colWidth = 960/3;
@@ -3742,7 +3800,7 @@ async function openShareStatsModal(){
   ctx.fillText('PORTFOLIO SNAPSHOT', 62, 155);
 
   const invested = cards.reduce((s,c)=>s+(Number(c.purchasePrice)||0),0);
-  const value = cards.reduce((s,c)=>s+(c.status==='sold'?Number(c.soldPrice)||0:Number(c.currentValue)||0),0);
+  const value = cards.reduce((s,c)=>s+cardEffectiveValue(c),0);
   const gain = value - invested;
   const gainPct = invested ? (gain/invested*100) : 0;
 
@@ -3764,7 +3822,7 @@ async function openShareStatsModal(){
   const stats = [
     ['INVESTED', fmtMoney(invested)],
     ['TOTAL CARDS', String(cards.length)],
-    ['HOLDING', String(cards.filter(c=>c.status!=='sold').length)],
+    ['HOLDING', String(cards.filter(c=>!isRealized(c)).length)],
   ];
   const colWidth = 960/3;
   stats.forEach((s,i) => {
@@ -3778,7 +3836,7 @@ async function openShareStatsModal(){
   });
 
   if(cards.length){
-    const valueOf = (c) => c.status==='sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0);
+    const valueOf = cardEffectiveValue;
     const top = cards.reduce((best,c) => valueOf(c) > valueOf(best) ? c : best, cards[0]);
     ctx.strokeStyle = 'rgba(28,37,65,0.15)';
     ctx.beginPath(); ctx.moveTo(60,720); ctx.lineTo(1020,720); ctx.stroke();
@@ -3873,12 +3931,13 @@ const ACHIEVEMENTS = [
   { id:'fifty_cards', icon:'🏛️', label:'Big collection', desc:'Reach 50 cards', check: () => cards.length >= 50 },
   { id:'hundred_cards', icon:'👑', label:'Serious collector', desc:'Reach 100 cards', check: () => cards.length >= 100 },
   { id:'first_sale', icon:'💰', label:'First sale', desc:'Sell a card', check: () => cards.some(c => c.status === 'sold') },
-  { id:'diamond_hands', icon:'💎', label:'Diamond hands', desc:'Hold a card a year or more', check: () => cards.some(c => c.status !== 'sold' && daysSince(c.purchaseDate) !== null && daysSince(c.purchaseDate) >= 365) },
+  { id:'first_trade', icon:'🔄', label:'First trade', desc:'Trade a card', check: () => cards.some(c => c.status === 'traded') },
+  { id:'diamond_hands', icon:'💎', label:'Diamond hands', desc:'Hold a card a year or more', check: () => cards.some(c => !isRealized(c) && daysSince(c.purchaseDate) !== null && daysSince(c.purchaseDate) >= 365) },
   { id:'diversified', icon:'🌐', label:'Diversified', desc:'Own cards from 5+ sports', check: () => new Set(cards.map(c => (c.sport||'').trim().toLowerCase()).filter(Boolean)).size >= 5 },
   { id:'graded_up', icon:'🏅', label:'Graded up', desc:'Own 5+ graded cards', check: () => cards.filter(c => c.grade && c.grade.trim() && c.grade.trim().toLowerCase() !== 'raw').length >= 5 },
   { id:'in_the_green', icon:'📈', label:'In the green', desc:'Positive overall gain', check: () => {
     const invested = cards.reduce((s,c)=>s+(Number(c.purchasePrice)||0),0);
-    const value = cards.reduce((s,c)=>s+(c.status==='sold'?Number(c.soldPrice)||0:Number(c.currentValue)||0),0);
+    const value = cards.reduce((s,c)=>s+cardEffectiveValue(c),0);
     return invested > 0 && value > invested;
   }},
   { id:'photographer', icon:'📸', label:'Photographer', desc:'Add photos to 5+ cards', check: () => Object.values(photos).filter(arr => arr && arr.length > 0).length >= 5 },
@@ -3901,7 +3960,7 @@ async function saveMilestone(){
 
 function checkValueMilestones(){
   if(cards.length === 0) return;
-  const value = cards.reduce((s,c) => s + (c.status === 'sold' ? (Number(c.soldPrice)||0) : (Number(c.currentValue)||0)), 0);
+  const value = cards.reduce((s,c) => s + cardEffectiveValue(c), 0);
   const crossed = VALUE_MILESTONES.filter(m => value >= m && m > highestMilestoneCelebrated);
   if(crossed.length > 0){
     const newHigh = Math.max(...crossed);
@@ -4074,10 +4133,10 @@ async function saveAvatar(dataUrl){
 }
 
 function exportCsv(){
-  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Cert Number','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Notes','Grading Status','Grading Company','Grading Submitted Date','Listed Status','Listed Platform','Listed Price','Listed Url','Shipping Status','Ship Source','Ship Expected','Ship Tracking'];
+  const headers = ['Player','Sport','Year','Set','Card #','Variant','Grade','Cert Number','Status','Purchase Price','Purchase Date','Current Value','Sold Price','Sold Date','Traded Date','Traded Value','Traded For','Notes','Grading Status','Grading Company','Grading Submitted Date','Listed Status','Listed Platform','Listed Price','Listed Url','Shipping Status','Ship Source','Ship Expected','Ship Tracking'];
   const rows = cards.map(c => [
     c.player, c.sport, c.year, c.set, c.number, c.variant, c.grade, c.certNumber, c.status,
-    c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.notes,
+    c.purchasePrice, c.purchaseDate, c.currentValue, c.soldPrice, c.soldDate, c.tradedDate, c.tradedValue, c.tradedFor, c.notes,
     c.gradingStatus, c.gradingCompany, c.gradingSubmittedDate,
     c.listedStatus, c.listedPlatform, c.listedPrice, c.listedUrl,
     c.shippingStatus, c.shipSource, c.shipExpected, c.shipTracking
@@ -4253,6 +4312,9 @@ function importCsvFile(file){
       currentValue: colIndex(['current value','value ($)','value']),
       soldPrice: colIndex(['sold price']),
       soldDate: colIndex(['sold date']),
+      tradedDate: colIndex(['traded date']),
+      tradedValue: colIndex(['traded value']),
+      tradedFor: colIndex(['traded for']),
       notes: colIndex(['notes']),
       gradingStatus: colIndex(['grading status']),
       gradingCompany: colIndex(['grading company']),
@@ -4285,8 +4347,12 @@ function importCsvFile(file){
       const purchaseDate = normalizeDate(get(r, 'purchaseDate')) || todayIso();
       const soldDateRaw = get(r, 'soldDate');
       const soldDate = normalizeDate(soldDateRaw);
+      const tradedValue = parseFloat(get(r, 'tradedValue')) || 0;
+      const tradedDateRaw = get(r, 'tradedDate');
+      const tradedDate = normalizeDate(tradedDateRaw);
       const statusRaw = get(r, 'status').toLowerCase();
-      const isSold = statusRaw === 'sold' || (!statusRaw && !!soldDate);
+      const isTraded = statusRaw === 'traded' || (!statusRaw && !soldDate && !!tradedDate);
+      const isSold = !isTraded && (statusRaw === 'sold' || (!statusRaw && !!soldDate));
 
       const card = {
         id: uid(),
@@ -4301,10 +4367,13 @@ function importCsvFile(file){
         certNumber: get(r, 'certNumber'),
         purchasePrice,
         purchaseDate,
-        status: isSold ? 'sold' : 'holding',
-        currentValue: isSold ? 0 : currentValue,
+        status: isSold ? 'sold' : isTraded ? 'traded' : 'holding',
+        currentValue: (isSold || isTraded) ? 0 : currentValue,
         soldPrice: isSold ? soldPrice : 0,
         soldDate: isSold ? (soldDate || todayIso()) : '',
+        tradedValue: isTraded ? tradedValue : 0,
+        tradedDate: isTraded ? (tradedDate || todayIso()) : '',
+        tradedFor: get(r, 'tradedFor'),
         notes: get(r, 'notes'),
         gradingStatus: get(r, 'gradingStatus') === 'submitted' ? 'submitted' : '',
         gradingCompany: get(r, 'gradingCompany'),
@@ -4321,6 +4390,8 @@ function importCsvFile(file){
       };
       if(isSold){
         pushHistoryPoint(card, card.soldDate, soldPrice);
+      }else if(isTraded){
+        pushHistoryPoint(card, card.tradedDate, tradedValue);
       }else{
         // Always record today as the "last updated" point so a card with an older
         // purchase date doesn't immediately show as needing a price check.
