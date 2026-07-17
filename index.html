@@ -1059,7 +1059,7 @@
       <select id="sortBy">
         <option value="roi_desc">Sort: ROI (high to low)</option>
         <option value="roi_asc">Sort: ROI (low to high)</option>
-        <option value="value_desc">Sort: current value</option>
+        <option value="value_desc" selected>Sort: current value</option>
         <option value="date_desc">Sort: recently added</option>
         <option value="date_asc">Sort: oldest added</option>
       </select>
@@ -2657,6 +2657,8 @@ function getFilteredSorted(){
     if(sortBy === 'roi_desc') return cardRoi(b) - cardRoi(a);
     if(sortBy === 'roi_asc') return cardRoi(a) - cardRoi(b);
     if(sortBy === 'value_desc'){
+      const aRealized = isRealized(a), bRealized = isRealized(b);
+      if(aRealized !== bRealized) return aRealized ? 1 : -1;
       return cardEffectiveValue(b) - cardEffectiveValue(a);
     }
     if(sortBy === 'date_desc') return (b.createdAt||0) - (a.createdAt||0);
