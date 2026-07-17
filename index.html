@@ -1645,7 +1645,7 @@ function loadHeic2Any(){
   if(heic2anyLoadPromise) return heic2anyLoadPromise;
   heic2anyLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Could not load HEIC support. Check your connection and try again.'));
     document.head.appendChild(script);
@@ -1660,6 +1660,9 @@ function isHeicFile(file){
 async function ensureBrowserCompatibleImage(file){
   if(!isHeicFile(file)) return file;
   await loadHeic2Any();
+  if(typeof window.heic2any !== 'function'){
+    throw new Error('HEIC support library did not load correctly.');
+  }
   const result = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
   const blob = Array.isArray(result) ? result[0] : result;
   return blob;
