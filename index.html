@@ -1318,8 +1318,9 @@
       </div>
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
-      <div id="modalEditOnlyActions" class="hidden" style="display:flex;gap:10px;">
+      <div id="modalEditOnlyActions" class="hidden" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn secondary" id="modalShareBtn">Share</button>
+        <button class="btn secondary" id="modalListBtn">List on eBay</button>
         <button class="btn secondary" id="modalDuplicateBtn">Duplicate</button>
         <button class="btn danger" id="modalDeleteBtn">Delete</button>
       </div>
@@ -1359,6 +1360,34 @@
     <div id="achievementsList" class="achievements-grid"></div>
     <div class="modal-actions">
       <button class="btn secondary" id="achievementsCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="ebayListModalOverlay">
+  <div class="modal">
+    <h2>Prep eBay listing</h2>
+    <p class="sub">Auto-generated from this card's details — edit anything, then copy it into eBay's own listing form.</p>
+
+    <div class="field full" style="margin-top:10px;">
+      <label>Title <span id="ebayTitleCount" style="text-transform:none;letter-spacing:0;font-weight:400;"></span></label>
+      <input type="text" id="ebayTitleInput" maxlength="80">
+    </div>
+    <div class="modal-actions" style="justify-content:flex-end;margin-top:6px;margin-bottom:16px;">
+      <button class="btn secondary" id="ebayCopyTitleBtn">Copy title</button>
+    </div>
+
+    <div class="field full">
+      <label>Description</label>
+      <textarea id="ebayDescInput" style="min-height:180px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></textarea>
+    </div>
+    <div class="modal-actions" style="justify-content:flex-end;margin-top:6px;">
+      <button class="btn secondary" id="ebayCopyDescBtn">Copy description</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" id="ebayListCloseBtn">Close</button>
+      <button class="btn" id="ebayOpenSellPageBtn">Open eBay sell page ↗</button>
     </div>
   </div>
 </div>
@@ -2919,6 +2948,46 @@ async function confirmBulkSold(){
   renderAll();
 }
 
+function truncateToLength(str, max){
+  if(str.length <= max) return str;
+  const cut = str.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
+function buildEbayTitle(c){
+  const parts = [c.year, c.set, c.player, c.variant, c.number ? '#'+c.number : '', c.grade]
+    .map(p => (p||'').trim()).filter(Boolean);
+  return truncateToLength(parts.join(' '), 80);
+}
+
+function buildEbayDescription(c){
+  const lines = [];
+  if(c.player) lines.push(`Player: ${c.player}`);
+  const setLine = [c.year, c.set].filter(Boolean).join(' ');
+  if(setLine) lines.push(`Set: ${setLine}`);
+  if(c.number) lines.push(`Card #: ${c.number}`);
+  if(c.variant) lines.push(`Variant/Parallel: ${c.variant}`);
+  if(c.grade) lines.push(`Grade: ${c.grade}`);
+  if(c.certNumber) lines.push(`Certification #: ${c.certNumber}`);
+  if(c.notes) lines.push(`\nNotes: ${c.notes}`);
+  lines.push(`\nThe card shown in the photos is exactly what you will receive. Please reach out with any questions before purchasing!`);
+  return lines.join('\n');
+}
+
+let ebayListCardId = null;
+
+function openEbayListModal(id){
+  const c = cards.find(x => x.id === id);
+  if(!c) return;
+  ebayListCardId = id;
+  const title = buildEbayTitle(c);
+  document.getElementById('ebayTitleInput').value = title;
+  document.getElementById('ebayTitleCount').textContent = `(${title.length}/80)`;
+  document.getElementById('ebayDescInput').value = buildEbayDescription(c);
+  document.getElementById('ebayListModalOverlay').classList.remove('hidden');
+}
+
 function checkCardPrice(id){
   const c = cards.find(x => x.id === id);
   if(!c) return;
@@ -3631,6 +3700,31 @@ document.getElementById('cancelBtn').addEventListener('click', closeModal);
 document.getElementById('modalShareBtn').addEventListener('click', () => {
   const id = editingId;
   if(id) openShareCardModal(id);
+});
+document.getElementById('modalListBtn').addEventListener('click', () => {
+  const id = editingId;
+  if(id) openEbayListModal(id);
+});
+document.getElementById('ebayTitleInput').addEventListener('input', (e) => {
+  document.getElementById('ebayTitleCount').textContent = `(${e.target.value.length}/80)`;
+});
+document.getElementById('ebayCopyTitleBtn').addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText(document.getElementById('ebayTitleInput').value);
+    showToast('Title copied');
+  }catch(e){ alert('Could not copy — select the text and copy it manually.'); }
+});
+document.getElementById('ebayCopyDescBtn').addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText(document.getElementById('ebayDescInput').value);
+    showToast('Description copied');
+  }catch(e){ alert('Could not copy — select the text and copy it manually.'); }
+});
+document.getElementById('ebayOpenSellPageBtn').addEventListener('click', () => {
+  window.open('https://www.ebay.com/sl/sell', '_blank', 'noopener');
+});
+document.getElementById('ebayListCloseBtn').addEventListener('click', () => {
+  document.getElementById('ebayListModalOverlay').classList.add('hidden');
 });
 document.getElementById('modalDuplicateBtn').addEventListener('click', () => {
   const id = editingId;
