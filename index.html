@@ -2520,18 +2520,19 @@ function populatePortfolioRangeOptions(){
 function renderPortfolioAddedLine(start, end){
   const el = document.getElementById('portfolioAddedLine');
   if(!el) return;
-  const addedCards = cards.filter(c => {
+  const sel = document.getElementById('portfolioRangeFilter');
+  const isAllTime = sel.value === 'all';
+  const addedCards = isAllTime ? cards.slice() : cards.filter(c => {
     const d = normalizeDate(c.purchaseDate) || c.purchaseDate;
     if(!d) return false;
     return (!start || d >= start) && d <= end;
   });
   const spent = addedCards.reduce((s,c) => s + (Number(c.purchasePrice)||0), 0);
-  const sel = document.getElementById('portfolioRangeFilter');
   const rangeLabel = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text.toLowerCase() : 'this period';
   if(addedCards.length === 0){
-    el.innerHTML = `No cards added ${start ? 'in ' + rangeLabel : 'yet'}.`;
+    el.innerHTML = `No cards added ${isAllTime ? 'yet' : 'in ' + rangeLabel}.`;
   }else{
-    el.innerHTML = `<strong>${fmtMoney(spent)}</strong> spent on <strong>${addedCards.length}</strong> card${addedCards.length===1?'':'s'} added ${start ? 'in ' + rangeLabel : '(all time)'}.`;
+    el.innerHTML = `<strong>${fmtMoney(spent)}</strong> spent on <strong>${addedCards.length}</strong> card${addedCards.length===1?'':'s'} added ${isAllTime ? '(all time)' : 'in ' + rangeLabel}.`;
   }
 }
 
