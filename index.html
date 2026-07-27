@@ -310,6 +310,15 @@
   .chart-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
   .chart-panel-head h3{font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;margin:0;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);}
   #portfolioRangeFilter, #breakdownFilter{font-size:12px;padding:5px 8px;}
+  .chart-added-line{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .chart-added-line strong{color:var(--ink);font-weight:600;}
   .chart-wrap{position:relative;height:220px;}
 
   @media (max-width:800px){
@@ -1008,6 +1017,7 @@
         <select id="portfolioRangeFilter"><option value="all">All time</option></select>
       </div>
       <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
+      <div class="chart-added-line" id="portfolioAddedLine"></div>
     </div>
 
     <div class="chart-panel">
@@ -2507,6 +2517,24 @@ function populatePortfolioRangeOptions(){
   if([...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
 }
 
+function renderPortfolioAddedLine(start, end){
+  const el = document.getElementById('portfolioAddedLine');
+  if(!el) return;
+  const addedCards = cards.filter(c => {
+    const d = normalizeDate(c.purchaseDate) || c.purchaseDate;
+    if(!d) return false;
+    return (!start || d >= start) && d <= end;
+  });
+  const spent = addedCards.reduce((s,c) => s + (Number(c.purchasePrice)||0), 0);
+  const sel = document.getElementById('portfolioRangeFilter');
+  const rangeLabel = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text.toLowerCase() : 'this period';
+  if(addedCards.length === 0){
+    el.innerHTML = `No cards added ${start ? 'in ' + rangeLabel : 'yet'}.`;
+  }else{
+    el.innerHTML = `<strong>${fmtMoney(spent)}</strong> spent on <strong>${addedCards.length}</strong> card${addedCards.length===1?'':'s'} added ${start ? 'in ' + rangeLabel : '(all time)'}.`;
+  }
+}
+
 function getPortfolioRangeBounds(){
   const sel = document.getElementById('portfolioRangeFilter');
   const val = sel ? sel.value : 'all';
@@ -2549,6 +2577,8 @@ function renderPortfolioChart(){
 
   const timelines = cards.map(c => getCardTimeline(c));
   const { start, end } = getPortfolioRangeBounds();
+
+  renderPortfolioAddedLine(start, end);
 
   let eventDates = Array.from(new Set(timelines.flat().map(p => p.date)));
   eventDates = eventDates.filter(d => (!start || d >= start) && d <= end);
