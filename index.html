@@ -1014,7 +1014,10 @@
     <div class="chart-panel">
       <div class="chart-panel-head">
         <h3>Portfolio value over time</h3>
-        <select id="portfolioRangeFilter"><option value="all">All time</option></select>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="portfolioRangeFilter"><option value="all">All time</option></select>
+          <button class="icon-btn" id="toggleAddedLineBtn" style="flex:none;padding:5px 10px;font-size:11px;" title="Show or hide the spend total below the chart">👁</button>
+        </div>
       </div>
       <div class="chart-wrap"><canvas id="portfolioChart"></canvas></div>
       <div class="chart-added-line" id="portfolioAddedLine"></div>
@@ -2517,6 +2520,22 @@ function populatePortfolioRangeOptions(){
   if([...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
 }
 
+let showSpendLine = true;
+try{ showSpendLine = localStorage.getItem('revivalCardsShowSpendLine') !== 'false'; }catch(e){}
+
+function updateSpendLineToggleUI(){
+  const btn = document.getElementById('toggleAddedLineBtn');
+  if(btn) btn.textContent = showSpendLine ? '👁' : '🙈';
+  const el = document.getElementById('portfolioAddedLine');
+  if(el) el.classList.toggle('hidden', !showSpendLine);
+}
+
+function toggleSpendLine(){
+  showSpendLine = !showSpendLine;
+  try{ localStorage.setItem('revivalCardsShowSpendLine', showSpendLine ? 'true' : 'false'); }catch(e){}
+  updateSpendLineToggleUI();
+}
+
 function renderPortfolioAddedLine(start, end){
   const el = document.getElementById('portfolioAddedLine');
   if(!el) return;
@@ -2534,6 +2553,7 @@ function renderPortfolioAddedLine(start, end){
   }else{
     el.innerHTML = `<strong>${fmtMoney(spent)}</strong> spent on <strong>${addedCards.length}</strong> card${addedCards.length===1?'':'s'} added ${isAllTime ? '(all time)' : 'in ' + rangeLabel}.`;
   }
+  updateSpendLineToggleUI();
 }
 
 function getPortfolioRangeBounds(){
@@ -3811,6 +3831,7 @@ document.getElementById('gridArea').addEventListener('mouseout', (e) => {
   if(img) img.style.transform = '';
 });
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
+document.getElementById('toggleAddedLineBtn').addEventListener('click', toggleSpendLine);
 document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
 document.getElementById('searchInput').addEventListener('input', renderGrid);
