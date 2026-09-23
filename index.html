@@ -2609,6 +2609,13 @@ function totalAsOf(date, timelines){
     const c = cards[i];
     const pDate = normalizeDate(c.purchaseDate) || c.purchaseDate;
     if(pDate && date < pDate) return;
+    if(isRealized(c)){
+      const rawExit = c.status === 'sold' ? c.soldDate : c.tradedDate;
+      const exitDate = normalizeDate(rawExit) || rawExit;
+      // Once sold/traded, this card no longer counts toward current holdings —
+      // matches how the scoreboard's "Current Value" stat works.
+      if(exitDate && date > exitDate) return;
+    }
     let val = 0;
     for(const p of tl){ if(p.date <= date) val = p.value; else break; }
     sum += val;
@@ -3119,10 +3126,16 @@ function renderQuickStats(){
   const graderCounts = {};
   cards.forEach(c => {
     const key = (c.grade || '').trim();
+    const upper = key.toUpperCase();
     let label = 'Raw';
-    if(key){
-      const m = key.match(/\b(PSA|BGS|BECKETT|SGC|CSG|HGA|CGC)\b/i);
-      label = m ? m[1].toUpperCase() : 'Graded';
+    if(key && upper !== 'RAW'){
+      if(upper.startsWith('PSA')) label = 'PSA';
+      else if(upper.startsWith('BGS') || upper.startsWith('BECKETT')) label = 'BGS';
+      else if(upper.startsWith('SGC')) label = 'SGC';
+      else if(upper.startsWith('CSG')) label = 'CSG';
+      else if(upper.startsWith('HGA')) label = 'HGA';
+      else if(upper.startsWith('CGC')) label = 'CGC';
+      else label = 'Graded';
     }
     graderCounts[label] = (graderCounts[label]||0) + 1;
   });
