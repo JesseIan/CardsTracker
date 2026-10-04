@@ -227,6 +227,19 @@
   .sb-value.pos{color:#D9C27A;}
   .sb-value.neg{color:#E39A9C;}
   .sb-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:4px;color:#B9C4AE;}
+  .sb-toggle{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    margin-top:4px;
+    padding:0;
+    background:none;
+    border:none;
+    color:#B9C4AE;
+    cursor:pointer;
+    text-decoration:underline dotted;
+    text-underline-offset:3px;
+  }
+  .sb-toggle:hover{color:#F5F0E1;}
 
   /* ---------- quick stats strip ---------- */
   .quick-stats{
@@ -995,6 +1008,7 @@
       <div class="sb-stat">
         <div class="sb-label">Invested</div>
         <div class="sb-value" id="statInvested">$0</div>
+        <button class="sb-toggle" id="investedToggleBtn" title="Switch between money in cards you still hold and your all-time total">held cards ⇄</button>
       </div>
       <div class="sb-stat">
         <div class="sb-label">Current value</div>
@@ -2496,13 +2510,25 @@ function getCardTimeline(c){
   return hist;
 }
 
+let investedMode = 'held';
+try{ investedMode = localStorage.getItem('revivalCardsInvestedMode') === 'all' ? 'all' : 'held'; }catch(e){}
+
+function toggleInvestedMode(){
+  investedMode = investedMode === 'held' ? 'all' : 'held';
+  try{ localStorage.setItem('revivalCardsInvestedMode', investedMode); }catch(e){}
+  renderSummary();
+}
+
 function renderSummary(){
-  const invested = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const investedAllTime = cards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
   const value = cards.reduce((s,c)=> s + cardPortfolioValue(c), 0);
 
   const holding = cards.filter(c => !isRealized(c));
   const realizedCards = cards.filter(isRealized);
   const holdingInvested = holding.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
+  const invested = investedMode === 'held' ? holdingInvested : investedAllTime;
+  const toggleBtn = document.getElementById('investedToggleBtn');
+  if(toggleBtn) toggleBtn.textContent = (investedMode === 'held' ? 'held cards' : 'all time') + ' ⇄';
   const holdingValue = holding.reduce((s,c)=> s + (Number(c.currentValue)||0), 0);
   const soldInvested = realizedCards.reduce((s,c)=> s + (Number(c.purchasePrice)||0), 0);
   const soldValue = realizedCards.reduce((s,c)=> s + cardEffectiveValue(c), 0);
@@ -3893,6 +3919,7 @@ document.getElementById('gridArea').addEventListener('mouseout', (e) => {
   if(img) img.style.transform = '';
 });
 document.getElementById('portfolioRangeFilter').addEventListener('change', renderPortfolioChart);
+document.getElementById('investedToggleBtn').addEventListener('click', toggleInvestedMode);
 document.getElementById('toggleAddedLineBtn').addEventListener('click', toggleSpendLine);
 document.getElementById('breakdownFilter').addEventListener('change', renderBreakdownChart);
 document.getElementById('filterStatus').addEventListener('change', renderGrid);
